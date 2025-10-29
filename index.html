@@ -3,78 +3,79 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Dominion Isles — Tiny Strategy Prototype</title>
+<title>Empire Forge — Islands RTS Prototype</title>
 <style>
   :root{
-    --bg:#0b1220;--panel:#0f1724;--accent:#7dd3fc;--muted:#94a3b8;
-    --p0:#6ee7b7;--p1:#fb7185;
+    --bg:#071021; --panel:#0f1724; --accent:#7dd3fc; --muted:#94a3b8;
+    --player:#6ee7b7; --ai:#fb7185; --neutral:#fbbf24;
   }
-  html,body{height:100%;margin:0;background:#071021;color:#dbeafe;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  .app{display:grid;grid-template-columns:1fr 340px;gap:12px;height:100vh;padding:12px}
-  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:10px;padding:12px;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
-  canvas{display:block;width:100%;height:calc(100vh - 48px);border-radius:8px;background:#042233}
+  html,body{margin:0;height:100%;background:var(--bg);color:#e6eef8;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;}
+  .app{display:grid;grid-template-columns:1fr 360px;gap:12px;height:100vh;padding:12px}
+  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:10px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.6);position:relative}
+  canvas{width:100%; height:calc(100vh - 36px); display:block; background:#022631; border-radius:8px}
   .side{display:flex;flex-direction:column;gap:10px}
-  .row{display:flex;gap:8px;align-items:center}
+  .title{font-weight:700;font-size:18px}
+  .resources{display:flex;gap:6px;flex-wrap:wrap}
+  .res{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:8px;font-size:13px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
   button{background:#062635;border:1px solid rgba(255,255,255,0.03);color:var(--accent);padding:8px 10px;border-radius:8px;cursor:pointer}
-  .muted{color:var(--muted);font-size:13px}
-  .resources{display:flex;gap:8px;flex-wrap:wrap}
-  .res{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:8px;font-size:13px}
-  .log{height:220px;overflow:auto;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;font-size:13px}
-  .hud{position:absolute;left:16px;top:16px;padding:8px;background:rgba(0,0,0,0.4);border-radius:8px}
+  select,input{padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:#dbeafe}
   .small{font-size:13px;color:var(--muted)}
-  .title{font-weight:700;font-size:18px;margin-bottom:6px}
+  .log{height:260px;overflow:auto;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;font-size:13px}
+  .hud{position:absolute;left:12px;top:12px;background:rgba(0,0,0,0.4);padding:8px;border-radius:8px;font-size:13px}
+  .selectedBox{position:absolute;right:12px;top:12px;background:rgba(0,0,0,0.4);padding:8px;border-radius:8px;font-size:13px;min-width:180px}
+  .mini{font-size:12px;color:var(--muted)}
   .bar{height:8px;background:#04161d;border-radius:6px;overflow:hidden}
-  .hp{height:100%;background:linear-gradient(90deg,#fca5a5,#86efac)}
-  @media(max-width:900px){.app{grid-template-columns:1fr;grid-auto-rows:auto} canvas{height:60vh}}
+  .hp{height:100%;background:#86efac}
+  @media(max-width:1000px){.app{grid-template-columns:1fr; grid-auto-rows: auto} canvas{height:60vh}}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="panel" style="position:relative;padding:10px;">
-    <div class="hud small" id="topHud">Turn 1 — Player • Phase: Player</div>
-    <canvas id="mapCanvas"></canvas>
-    <div style="position:absolute;right:16px;bottom:18px;background:rgba(0,0,0,0.45);padding:8px;border-radius:8px;">
-      <div class="small">Selected:</div>
-      <div id="selectedInfo" class="small">None</div>
-    </div>
+  <div class="panel">
+    <div class="hud small" id="topInfo">Turn 1 • Phase: Player</div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="selectedBox" id="selBox">Selected: None</div>
   </div>
 
   <aside class="panel side">
     <div>
-      <div class="title">Dominion Isles</div>
-      <div class="muted">Capture and upgrade cities, manage resources and build an army to crush the rival AI.</div>
+      <div class="title">Empire Forge</div>
+      <div class="small">Capture cities and villages, load troops into transports, and conquer the islands. Save & publish on GitHub Pages.</div>
     </div>
 
-    <div class="resources" id="resourcePanel"></div>
+    <div class="resources" id="resourceDisplay"></div>
 
-    <div class="row">
-      <button id="newBtn">New Game</button>
-      <button id="endBtn">End Turn</button>
-      <button id="nextAI" title="Run AI turn (debug)">Run AI</button>
+    <div class="controls">
+      <button id="newGameBtn">New Game</button>
+      <button id="endTurnBtn">End Turn</button>
+      <button id="saveBtn">Save</button>
+      <button id="loadBtn">Load</button>
     </div>
 
-    <div class="row">
-      <select id="trainType">
-        <option value="infantry">Infantry (Land)</option>
-        <option value="tank">Tank (Land)</option>
-        <option value="artillery">Artillery (Land)</option>
-        <option value="fighter">Fighter (Air)</option>
-        <option value="bomber">Bomber (Air)</option>
-        <option value="frigate">Frigate (Naval)</option>
-        <option value="battleship">Battleship (Naval)</option>
-        <option value="sub">Submarine (Naval)</option>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="trainSelect">
+        <option value="infantry">Infantry</option>
+        <option value="tank">Tank</option>
+        <option value="artillery">Artillery</option>
+        <option value="fighter">Fighter</option>
+        <option value="bomber">Bomber</option>
+        <option value="frigate">Frigate</option>
+        <option value="battleship">Battleship</option>
+        <option value="sub">Submarine</option>
+        <option value="transport">Transport</option>
       </select>
-      <button id="trainBtn">Train (in selected city)</button>
+      <button id="trainBtn">Train (selected city)</button>
       <button id="upgradeBtn">Upgrade City</button>
     </div>
 
     <div>
       <div class="small">Controls</div>
-      <div class="muted">
-        - Click units/cities to select.<br>
-        - Right-click a tile to move/attack.<br>
-        - Train units from a selected city (costs resources).<br>
-        - Cities produce resources each turn. Units consume Food each turn as upkeep.<br>
+      <div class="small mini">
+        - Left-click to select unit / city / village.<br>
+        - Right-click to move / attack / load / unload.<br>
+        - Transport: right-click a friendly transport to load when adjacent, then right-click a coastal tile to unload.<br>
+        - Train units in owned cities, upgrade to increase production.<br>
       </div>
     </div>
 
@@ -83,485 +84,751 @@
       <div id="log" class="log"></div>
     </div>
 
-    <div class="small">Tip: fog of war hides tiles outside vision. Use units to scout.</div>
+    <div class="small">Tip: use transports to cross water. Villages provide small resource bonuses and can be captured quickly.</div>
   </aside>
 </div>
 
 <script>
 /*
-  Dominion Isles - Single file strategy prototype
-  - Map: 50x50 tiles
+  Empire Forge — Single-file RTS prototype (turn-based mode)
+  - 50x50 tile map
   - Terrain: plains, forest, mountain, water
   - Resources: gold, iron, wood, stone, food
-  - Units: many types (stats listed below)
-  - Cities: produce resources, can be upgraded and train units
-  - Turn-based loop: collect -> commands -> end turn
-  - A* pathfinding and simple AI
+  - Cities: player, AI, neutral; villages: small neutral settlements
+  - Units including Transport that can carry land units
+  - Fog of war, A* pathfinding, AI that uses transports and coordinates invasions
+  - Save/load + New Game
 */
 
-/* ---------------------------
-   CONFIG / CONSTANTS
-   --------------------------- */
+/* =========================
+   CONFIG
+   ========================= */
 const TILE_COUNT = 50;
-const TILE_SIZE = 12; // px
-const VISIBLE_SIZE = TILE_SIZE * TILE_COUNT;
-const FOG = true;
-const PLAYER_COL = '#6ee7b7'; // green
-const AI_COL = '#fb7185';     // pink
+const TILE_SIZE = 12; // pixels per tile
+const CANVAS_SIZE = TILE_COUNT * TILE_SIZE;
+const FOG_ENABLED = true;
+const VIS_RADIUS_UNIT = 5; // visibility radius for regular units
+const VIS_RADIUS_CITY = 4;
+const TRANSPORT_CAPACITY = 4; // how many land units a transport can carry
+const CITY_CAPTURE_HOLD_TURNS = 3;
+const VILLAGE_CAPTURE_HOLD = 1;
 
-// Terrain types and movement cost multipliers for unit categories
+/* Colors */
+const COLOR = {
+  water:'#04314a', plains:'#2f8b57', forest:'#196636', mountain:'#565a61',
+  player:'#6ee7b7', ai:'#fb7185', neutral:'#fbbf24', village:'#f9a825'
+};
+
+/* Terrain info */
 const TERRAIN = {
-  plains: {color:'#2f8b57', move:1, resource:null},
-  forest: {color:'#1f6b3a', move:1.5, resource:'wood'},
-  mountain: {color:'#4b5563', move:3, resource:'iron'},
-  water: {color:'#04253b', move:1, resource:null}
+  water: {move:1, passableBy:['navy']},
+  plains: {move:1, passableBy:['land','air']},
+  forest: {move:1.5, passableBy:['land','air']},
+  mountain: {move:3, passableBy:['land','air'], resource:'iron'}
 };
 
-// Resources list
-const RESOURCES = ['gold','iron','wood','stone','food'];
+/* Resource list */
+const RESOURCE_KEYS = ['gold','iron','wood','stone','food'];
 
-// Unit definitions
-const UNIT_TYPES = {
-  infantry:  {name:'Infantry',  cat:'land',  hp:10, atk:4, def:2, speed:2, range:1, cost:{gold:30,food:5}, upkeep:{food:1}},
-  tank:      {name:'Tank',      cat:'land',  hp:18, atk:8, def:5, speed:2, range:1, cost:{gold:80,iron:10,food:3}, upkeep:{food:2}},
-  artillery: {name:'Artillery', cat:'land',  hp:12, atk:10,def:1, speed:1, range:3, cost:{gold:70,iron:5,food:2}, upkeep:{food:2}},
-  fighter:   {name:'Fighter',   cat:'air',   hp:12, atk:7, def:3, speed:4, range:3, cost:{gold:150,iron:6,food:4}, upkeep:{food:3}},
-  bomber:    {name:'Bomber',    cat:'air',   hp:16, atk:12,def:1, speed:3, range:3, cost:{gold:200,iron:10,food:6}, upkeep:{food:4}},
-  frigate:   {name:'Frigate',   cat:'navy',  hp:16, atk:6, def:4, speed:3, range:2, cost:{gold:120,iron:8,food:3}, upkeep:{food:2}},
-  battleship:{name:'Battleship',cat:'navy',  hp:28, atk:12,def:8, speed:2, range:3, cost:{gold:300,iron:20,food:6}, upkeep:{food:5}},
-  sub:       {name:'Submarine', cat:'navy',  hp:14, atk:9, def:2, speed:3, range:1, cost:{gold:140,iron:8,food:3}, upkeep:{food:2}}
+/* Unit definitions */
+const UNIT_DEF = {
+  infantry:  {name:'Infantry', cat:'land',  hp:10, atk:4, def:2, speed:2, range:1, cost:{gold:30,food:5}, upkeep:{food:1}},
+  tank:      {name:'Tank',     cat:'land',  hp:20, atk:9, def:6, speed:2, range:1, cost:{gold:100,iron:10,food:3}, upkeep:{food:2}},
+  artillery: {name:'Artillery',cat:'land',  hp:12, atk:11,def:1, speed:1, range:3, cost:{gold:90,iron:6,food:2}, upkeep:{food:2}},
+  fighter:   {name:'Fighter',  cat:'air',   hp:14, atk:8, def:3, speed:4, range:3, cost:{gold:160,iron:6,food:4}, upkeep:{food:3}},
+  bomber:    {name:'Bomber',   cat:'air',   hp:20, atk:14,def:2, speed:3, range:3, cost:{gold:220,iron:10,food:6}, upkeep:{food:4}},
+  frigate:   {name:'Frigate',  cat:'navy',  hp:18, atk:7, def:4, speed:3, range:2, cost:{gold:120,iron:8,food:3}, upkeep:{food:2}},
+  battleship:{name:'Battleship',cat:'navy', hp:30, atk:14,def:9, speed:2, range:3, cost:{gold:320,iron:22,food:6}, upkeep:{food:5}},
+  sub:       {name:'Submarine',cat:'navy',  hp:16, atk:10,def:3, speed:3, range:1, cost:{gold:150,iron:8,food:3}, upkeep:{food:2}},
+  transport: {name:'Transport',cat:'navy',  hp:18, atk:0, def:3, speed:3, range:1, cost:{gold:140,wood:8,food:4}, upkeep:{food:2}, capacity:TRANSPORT_CAPACITY}
 };
 
-// City production base per level
-const CITY_BASE = {gold:5,iron:1,wood:1,stone:1,food:5}; // per level
-const CITY_UPGRADE_COST_MULT = 1.8;
+/* City base production per level */
+const CITY_BASE_PROD = {gold:6,iron:1,wood:2,stone:1,food:8};
+const CITY_UPGRADE_MULT = 1.9;
 
-/* ---------------------------
-   GAME STATE
-   --------------------------- */
-let canvas = document.getElementById('mapCanvas');
-canvas.width = VISIBLE_SIZE;
-canvas.height = VISIBLE_SIZE;
-let ctx = canvas.getContext('2d');
+/* =========================
+   STATE
+   ========================= */
+const canvas = document.getElementById('gameCanvas');
+canvas.width = CANVAS_SIZE;
+canvas.height = CANVAS_SIZE;
+const ctx = canvas.getContext('2d');
 
 let state = {
-  turn: 1,
-  phase: 'player', // 'player' or 'ai'
-  map: [], // tiles[y][x]
-  units: [], // unit objects
-  cities: [], // city objects
-  players: [
-    {id:0,name:'Player',col:PLAYER_COL,resources:{gold:120,iron:10,wood:8,stone:6,food:40}},
-    {id:1,name:'Rival',col:AI_COL,resources:{gold:100,iron:6,wood:6,stone:4,food:30}}
+  turn:1,
+  phase:'player', // 'player' | 'ai' | 'end'
+  map:[], // TILE_COUNT x TILE_COUNT
+  units:[], // list of units
+  cities:[], // both player and ai and neutral: {id,x,y,owner(level -1 neutral),level, captureProgress}
+  villages:[], // neutral small settlements
+  players:[
+    {id:0, name:'Player', color:COLOR.player, resources:{gold:180,iron:12,wood:12,stone:8,food:60}},
+    {id:1, name:'Rival',  color:COLOR.ai,     resources:{gold:140,iron:8,wood:10,stone:6,food:50}}
   ],
-  selected: null,
+  selected: null, // {type:'unit'|'city'|'village', id:...}
   log: []
 };
 
-/* ---------------------------
-   UTILITIES
-   --------------------------- */
+/* =========================
+   HELPERS
+   ========================= */
 const rand = n => Math.floor(Math.random()*n);
-const choice = arr => arr[rand(arr.length)];
-function pushLog(s){
-  state.log.unshift({t:Date.now(),s});
-  const el = document.getElementById('log');
-  el.innerHTML = state.log.slice(0,80).map(x=>`<div style="padding:4px">${x.s}</div>`).join('');
-}
-function inBounds(x,y){ return x>=0 && y>=0 && x<TILE_COUNT && y<TILE_COUNT; }
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const keyxy = (x,y)=>`${x},${y}`;
 
-/* ---------------------------
+function pushLog(s){
+  state.log.unshift({t:Date.now(), s});
+  const el = document.getElementById('log');
+  el.innerHTML = state.log.slice(0,200).map(it=>`<div style="padding:4px">${it.s}</div>`).join('');
+}
+
+/* =========================
    MAP GENERATION
-   --------------------------- */
+   ========================= */
 function generateMap(){
-  // Simple procedural generation: noise via multiple random seeds influencing values
-  const map = Array.from({length:TILE_COUNT},()=>Array.from({length:TILE_COUNT},()=>({terrain:'plains',resource:null, city:null, owner:null})));
+  // create empty
+  const map = Array.from({length:TILE_COUNT},()=>Array.from({length:TILE_COUNT},()=>({terrain:'plains', resource:null, city:null, owner:null})));
+  // island seeds
   const seeds = [];
   const islandCount = 8 + rand(6);
-  for(let i=0;i<islandCount;i++){
-    seeds.push({x:rand(TILE_COUNT), y:rand(TILE_COUNT), r:6+rand(8), noise:rand(1000)});
-  }
-  for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++){
-    let v=0;
-    for(const s of seeds){
-      const dx=x-s.x, dy=y-s.y;
-      const d = Math.sqrt(dx*dx+dy*dy);
-      v += Math.max(0, (s.r + (Math.sin((dx+dy+s.noise)/5))*2) - d);
-    }
-    // coastline and water threshold
-    if(v < 3) map[y][x].terrain='water';
-    else {
-      // forest/mountain chance
-      const r = Math.random();
-      if(r < 0.12) map[y][x].terrain='forest';
-      else if(r < 0.18) map[y][x].terrain='mountain';
-      else map[y][x].terrain='plains';
-      // resource nodes on some tiles
-      if(map[y][x].terrain==='forest' && Math.random()<0.25) map[y][x].resource='wood';
-      if(map[y][x].terrain==='mountain' && Math.random()<0.25) map[y][x].resource='iron';
-      if(map[y][x].terrain==='plains' && Math.random()<0.06) map[y][x].resource='gold';
-      if(Math.random()<0.03 && map[y][x].terrain!=='water') map[y][x].resource='stone';
+  for(let i=0;i<islandCount;i++) seeds.push({x:rand(TILE_COUNT), y:rand(TILE_COUNT), r:6+rand(8), off: Math.random()*1000});
+  for(let y=0;y<TILE_COUNT;y++){
+    for(let x=0;x<TILE_COUNT;x++){
+      let v=0;
+      for(const s of seeds){
+        const dx=x-s.x, dy=y-s.y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        v += Math.max(0, (s.r + Math.sin((dx+dy+s.off)/5)*2) - d);
+      }
+      if(v < 3) map[y][x].terrain = 'water';
+      else {
+        const r=Math.random();
+        if(r<0.14) map[y][x].terrain='forest';
+        else if(r<0.2) map[y][x].terrain='mountain';
+        else map[y][x].terrain='plains';
+        // resources
+        if(map[y][x].terrain==='forest' && Math.random()<0.3) map[y][x].resource='wood';
+        if(map[y][x].terrain==='mountain' && Math.random()<0.28) map[y][x].resource='iron';
+        if(map[y][x].terrain==='plains' && Math.random()<0.04) map[y][x].resource='gold';
+        if(Math.random()<0.03 && map[y][x].terrain!=='water') map[y][x].resource='stone';
+      }
     }
   }
   return map;
 }
 
-/* ---------------------------
-   SPAWN PLAYERS (ensure on land)
-   --------------------------- */
-function findSpawnArea(map){
-  // look for land tile with 8-connected land neighbors
-  for(let tries=0;tries<10000;tries++){
+function findSpawn(map){
+  // find a land tile with no water immediately adjacent (prefer)
+  for(let tries=0; tries<5000; tries++){
     const x=rand(TILE_COUNT), y=rand(TILE_COUNT);
     if(map[y][x].terrain==='water') continue;
-    // check not surrounded by water in 3x3
-    let ok=true;
-    for(let dy=-1;dy<=1 && ok;dy++) for(let dx=-1;dx<=1;dx++){
+    // ensure not too close to edge and has some land around
+    let waterAdj=0;
+    for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
       const nx=x+dx, ny=y+dy;
-      if(inBounds(nx,ny) && map[ny][nx].terrain==='water') ok=false;
+      if(nx<0||ny<0||nx>=TILE_COUNT||ny>=TILE_COUNT) waterAdj++;
+      else if(map[ny][nx].terrain==='water') waterAdj++;
     }
-    if(ok) return {x,y};
+    if(waterAdj < 18) return {x,y};
   }
   // fallback
   for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++) if(map[y][x].terrain!=='water') return {x,y};
   return {x:0,y:0};
 }
 
-/* ---------------------------
-   INIT GAME
-   --------------------------- */
+/* =========================
+   CITY & VILLAGE CREATION
+   ========================= */
+let nextCityId = 1;
+function createCity(x,y, owner){
+  const city = {id: nextCityId++, x,y, owner, level:1, captureProgress:0};
+  state.cities.push(city);
+  state.map[y][x].city = city;
+  return city;
+}
+
+let nextVillageId = 1;
+function createVillage(x,y){
+  const v = {id: nextVillageId++, x,y, owner:null, captureProgress:0};
+  state.villages.push(v);
+  return v;
+}
+
+/* =========================
+   UNIT CREATION
+   ========================= */
+let nextUnitId = 1;
+function createUnit(type, owner, x, y){
+  const def = UNIT_DEF[type];
+  const u = {
+    id: nextUnitId++,
+    type, owner, x, y,
+    hp: def.hp, maxHp: def.hp, moves: def.speed, maxMoves:def.speed,
+    atk:def.atk, defStat:def.def, range:def.range, speed:def.speed,
+    cat:def.cat, upkeep:def.upkeep, loaded: [], // for transport: holds units' IDs
+    status:'idle', target:null
+  };
+  state.units.push(u);
+  return u;
+}
+
+/* =========================
+   INITIAL GAME SETUP
+   ========================= */
 function newGame(){
-  state.turn = 1; state.phase='player'; state.units=[]; state.cities=[]; state.log=[];
+  state.turn = 1;
+  state.phase = 'player';
   state.map = generateMap();
-  // Spawn two players on distinct land areas
-  const p0 = findSpawnArea(state.map);
-  const p1 = findSpawnArea(state.map);
-  // create cities
-  const city0 = createCity(p0.x,p0.y,0);
-  const city1 = createCity(p1.x,p1.y,1);
-  state.cities.push(city0,city1);
-  state.map[p0.y][p0.x].city = city0;
-  state.map[p1.y][p1.x].city = city1;
-  state.players[0].resources = {gold:120,iron:10,wood:8,stone:6,food:40};
-  state.players[1].resources = {gold:90,iron:6,wood:6,stone:4,food:30};
-  // initial scouting units
-  state.units.push(createUnit('infantry',0,p0.x+1,p0.y));
-  state.units.push(createUnit('frigate',1, p1.x+1,p1.y)); // AI naval
-  pushLog('New game started.');
+  state.units = [];
+  state.cities = [];
+  state.villages = [];
+  state.selected = null;
+  state.log = [];
+  nextCityId = 1; nextUnitId = 1; nextVillageId = 1;
+
+  // place player & ai cities
+  const spawn0 = findSpawn(state.map);
+  const spawn1 = findSpawn(state.map);
+  createCity(spawn0.x, spawn0.y, 0);
+  createCity(spawn1.x, spawn1.y, 1);
+
+  // create some neutral cities and villages
+  const neutralCount = 6 + rand(6);
+  let tries=0;
+  while(neutralCount>0 && state.cities.filter(c=>c.owner===null).length < neutralCount && tries < 10000){
+    tries++;
+    const x=rand(TILE_COUNT), y=rand(TILE_COUNT);
+    if(state.map[y][x].terrain==='water') continue;
+    if(state.map[y][x].city) continue;
+    // spread them somewhat
+    if(Math.random() < 0.5) createCity(x,y,null);
+  }
+  // villages
+  for(let i=0;i<18;i++){
+    const x=rand(TILE_COUNT), y=rand(TILE_COUNT);
+    if(state.map[y][x].terrain!=='water') createVillage(x,y);
+  }
+
+  // initial units for both players
+  const p0city = state.cities.find(c=>c.owner===0);
+  const p1city = state.cities.find(c=>c.owner===1);
+  createUnit('infantry', 0, p0city.x+1, p0city.y);
+  createUnit('frigate', 1, p1city.x+1, p1city.y);
+  createUnit('transport', 1, p1city.x+2, p1city.y);
+
+  state.players[0].resources = {gold:180,iron:12,wood:12,stone:8,food:60};
+  state.players[1].resources = {gold:140,iron:8,wood:10,stone:6,food:50};
+
+  pushLog('New game: islands generated. Capture neutral cities and villages.');
   redraw();
   updateUI();
 }
 
-/* ---------------------------
-   CITY / UNIT CREATION
-   --------------------------- */
-let nextUnitId = 1, nextCityId = 1;
-function createCity(x,y,owner){
-  return {id: nextCityId++, x,y, owner, level:1, captureProgress:0, garrison:[], defendBonus:1};
-}
-function createUnit(type,owner,x,y){
-  const def = UNIT_TYPES[type];
-  return {
-    id: nextUnitId++,
-    type, owner, x,y,
-    hp: def.hp,
-    moves: def.speed,
-    maxMoves: def.speed,
-    atk:def.atk, def:def.def,
-    range:def.range, speed:def.speed,
-    cat:def.cat,
-    upkeep: def.upkeep,
-    status:'idle',
-    target:null
-  };
+/* =========================
+   RENDERING (pixel-art-ish)
+   ========================= */
+function drawTile(x,y){
+  const t = state.map[y][x].terrain;
+  const base = (t==='water') ? COLOR.water : (t==='plains' ? COLOR.plains : (t==='forest'? COLOR.forest : COLOR.mountain));
+  ctx.fillStyle = base;
+  ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+  // small pixel art details: trees, rocks, waves
+  if(t==='forest' && Math.random()<0.02){
+    // small darker pixel
+    ctx.fillStyle = '#0f3f22';
+    ctx.fillRect(x*TILE_SIZE + 2, y*TILE_SIZE + 2, 2,2);
+  }
+  if(t==='mountain' && Math.random()<0.012){
+    ctx.fillStyle = '#3a3d42';
+    ctx.fillRect(x*TILE_SIZE+3, y*TILE_SIZE+2, 3,3);
+  }
+  if(t==='water' && Math.random()<0.04){
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect(x*TILE_SIZE + Math.floor(TILE_SIZE/2), y*TILE_SIZE + Math.floor(TILE_SIZE/2), 2,1);
+  }
+
+  // resource dot
+  if(state.map[y][x].resource){
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(x*TILE_SIZE + TILE_SIZE/2 - 2, y*TILE_SIZE + TILE_SIZE/2 - 2, 4,4);
+  }
 }
 
-/* ---------------------------
-   RENDER
-   --------------------------- */
 function redraw(){
+  // clear
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  // tiles
+
+  // draw tiles
   for(let y=0;y<TILE_COUNT;y++){
     for(let x=0;x<TILE_COUNT;x++){
-      const t = state.map[y][x];
-      // color by terrain
-      ctx.fillStyle = TERRAIN[t.terrain].color;
-      ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-      // resource icons
-      if(t.resource){
-        ctx.fillStyle = '#fef08a';
-        ctx.fillRect(x*TILE_SIZE + TILE_SIZE/2 -3, y*TILE_SIZE + TILE_SIZE/2 -3, 6,6);
-      }
-      // city marker
-      if(t.city){
-        const c = t.city;
-        ctx.fillStyle = c.owner===0?PLAYER_COL:AI_COL;
-        ctx.fillRect(x*TILE_SIZE+2, y*TILE_SIZE+2, TILE_SIZE-4, TILE_SIZE-4);
-        // level marker
-        ctx.fillStyle = '#000';
-        ctx.fillText('L'+c.level, x*TILE_SIZE+4, y*TILE_SIZE+10);
-      }
+      drawTile(x,y);
     }
   }
 
-  // fog of war overlay
-  if(FOG){
-    // build visibility map for player 0
-    const visible = Array.from({length:TILE_COUNT},()=>Array(TILE_COUNT).fill(false));
-    const visRadius = 5;
+  // draw villages
+  for(const v of state.villages){
+    ctx.fillStyle = COLOR.village;
+    ctx.fillRect(v.x*TILE_SIZE+2, v.y*TILE_SIZE+2, TILE_SIZE-4, TILE_SIZE-4);
+    ctx.fillStyle = '#000'; ctx.font='8px monospace'; ctx.fillText('V', v.x*TILE_SIZE + TILE_SIZE/2 -2, v.y*TILE_SIZE + TILE_SIZE/2 -2);
+  }
+
+  // draw cities
+  for(const c of state.cities){
+    const col = c.owner===0 ? state.players[0].color : (c.owner===1 ? state.players[1].color : COLOR.neutral);
+    ctx.fillStyle = col;
+    ctx.fillRect(c.x*TILE_SIZE+1, c.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
+    ctx.fillStyle = '#000';
+    ctx.font='9px monospace';
+    ctx.fillText('C'+c.level, c.x*TILE_SIZE+3, c.y*TILE_SIZE+8);
+  }
+
+  // fog-of-war overlay (player only)
+  let visible = Array.from({length:TILE_COUNT}, ()=>Array(TILE_COUNT).fill(false));
+  if(FOG_ENABLED){
+    // mark visibility from player units & cities
     for(const u of state.units.filter(u=>u.owner===0)){
-      for(let dy=-visRadius;dy<=visRadius;dy++) for(let dx=-visRadius;dx<=visRadius;dx++){
-        const nx=u.x+dx, ny=u.y+dy;
-        if(inBounds(nx,ny)) visible[ny][nx]=true;
+      const r = VIS_RADIUS_UNIT;
+      for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+        const nx=u.x+dx, ny=u.y+dy; if(nx>=0&&ny>=0&&nx<TILE_COUNT&&ny<TILE_COUNT) visible[ny][nx] = true;
       }
     }
     for(const c of state.cities.filter(c=>c.owner===0)){
-      for(let dy=-visRadius;dy<=visRadius;dy++) for(let dx=-visRadius;dx<=visRadius;dx++){
-        const nx=c.x+dx, ny=c.y+dy;
-        if(inBounds(nx,ny)) visible[ny][nx]=true;
+      const r = VIS_RADIUS_CITY;
+      for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+        const nx=c.x+dx, ny=c.y+dy; if(nx>=0&&ny>=0&&nx<TILE_COUNT&&ny<TILE_COUNT) visible[ny][nx] = true;
       }
     }
-    // overlay nonvisible
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++){
-      if(!visible[y][x]) ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE);
-    }
+    // overlay dark
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++) if(!visible[y][x]) ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE);
+  } else {
+    visible = Array.from({length:TILE_COUNT}, ()=>Array(TILE_COUNT).fill(true));
   }
 
-  // units (draw after fog so units in fog give visibility)
+  // draw units (draw after fog so they provide visibility)
   for(const u of state.units){
-    const px=u.x*TILE_SIZE+TILE_SIZE/2, py=u.y*TILE_SIZE+TILE_SIZE/2;
+    // only draw if visible by player or owner is player or fog disabled
+    const canSee = !FOG_ENABLED || visible[u.y][u.x] || u.owner===0;
+    if(!canSee) continue;
+    const px = u.x*TILE_SIZE + TILE_SIZE/2;
+    const py = u.y*TILE_SIZE + TILE_SIZE/2;
+    // small pixel-art icon: circle with letter
     ctx.beginPath();
-    ctx.arc(px,py, TILE_SIZE*0.4, 0, Math.PI*2);
-    ctx.fillStyle = state.players[u.owner].col;
+    ctx.arc(px, py, TILE_SIZE*0.38, 0, Math.PI*2);
+    ctx.fillStyle = state.players[u.owner].color;
     ctx.fill();
-    ctx.fillStyle = '#071021';
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font = '10px monospace';
-    ctx.fillText(u.type[0].toUpperCase(), px, py);
+    ctx.fillStyle = '#021018'; ctx.font='10px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(u.type[0].toUpperCase(), px, py+1);
+
     // hp bar
-    const w = TILE_SIZE*0.9, h=4;
-    const ratio = Math.max(0, u.hp / UNIT_TYPES[u.type].hp);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 8, w, h);
-    ctx.fillStyle = `linear-gradient(90deg, #fca5a5, #86efac)`; // not actually gradient but fine
+    const w = TILE_SIZE*0.9, h = 4;
+    const ratio = Math.max(0, u.hp / u.maxHp);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 7, w, h);
     ctx.fillStyle = '#86efac';
-    ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 8, w*ratio, h);
+    ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 7, w*ratio, h);
+
     // selection highlight
     if(state.selected && state.selected.type==='unit' && state.selected.id===u.id){
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
       ctx.strokeRect(u.x*TILE_SIZE+1, u.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
     }
+    // show load count for transport
+    if(u.type==='transport'){
+      ctx.fillStyle = '#000'; ctx.font='8px monospace'; ctx.fillText('+' + u.loaded.length, px+8, py-8);
+    }
   }
 
-  // selected city highlight
+  // selection highlight for city
   if(state.selected && state.selected.type==='city'){
-    const c = state.selected.city;
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
-    ctx.strokeRect(c.x*TILE_SIZE+1, c.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
+    const c = state.cities.find(cc=>cc.id===state.selected.id);
+    if(c){
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
+      ctx.strokeRect(c.x*TILE_SIZE+1, c.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
+    }
+  }
+  // village selection
+  if(state.selected && state.selected.type==='village'){
+    const v = state.villages.find(vv=>vv.id===state.selected.id);
+    if(v){
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
+      ctx.strokeRect(v.x*TILE_SIZE+1, v.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
+    }
   }
 
-  // HUD top
-  document.getElementById('topHud').textContent = `Turn ${state.turn} — Phase: ${state.phase.toUpperCase()}`;
+  // update top info and selected panel
+  document.getElementById('topInfo').textContent = `Turn ${state.turn} • Phase: ${state.phase.toUpperCase()}`;
+  updateSelectedBox();
 }
 
-/* ---------------------------
-   UI / Interaction
-   --------------------------- */
+/* =========================
+   INPUT HANDLING
+   ========================= */
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
 canvas.addEventListener('click', (ev)=>{
   const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((ev.clientX-rect.left)/ (rect.width / canvas.width) / TILE_SIZE);
-  const y = Math.floor((ev.clientY-rect.top)/ (rect.height / canvas.height) / TILE_SIZE);
-  handleLeftClick(x,y);
-});
-canvas.addEventListener('contextmenu', (ev)=>{ ev.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((ev.clientX-rect.left)/ (rect.width / canvas.width) / TILE_SIZE);
-  const y = Math.floor((ev.clientY-rect.top)/ (rect.height / canvas.height) / TILE_SIZE);
-  handleRightClick(x,y);
+  const mx = ev.clientX - rect.left;
+  const my = ev.clientY - rect.top;
+  const tx = Math.floor(mx / (rect.width / canvas.width) / TILE_SIZE);
+  const ty = Math.floor(my / (rect.height / canvas.height) / TILE_SIZE);
+  handleLeftClick(tx,ty);
 });
 
-function handleLeftClick(x,y){
-  if(!inBounds(x,y)) return;
-  // select unit if owned
-  const unit = state.units.find(u=>u.x===x && u.y===y && u.owner===0);
-  if(unit){ state.selected = {type:'unit', id:unit.id, unit}; updateSelectedInfo(); redraw(); return; }
-  // select city if any
-  const city = state.cities.find(c=>c.x===x && c.y===y);
-  if(city){ state.selected = {type:'city', id:city.id, city}; updateSelectedInfo(); redraw(); return; }
-  // otherwise clear selection
-  state.selected = null; updateSelectedInfo(); redraw();
+canvas.addEventListener('contextmenu', (ev)=>{
+  ev.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = ev.clientX - rect.left;
+  const my = ev.clientY - rect.top;
+  const tx = Math.floor(mx / (rect.width / canvas.width) / TILE_SIZE);
+  const ty = Math.floor(my / (rect.height / canvas.height) / TILE_SIZE);
+  handleRightClick(tx,ty);
+});
+
+function handleLeftClick(tx,ty){
+  if(!inBounds(tx,ty)) return;
+  // check units (player-owned first)
+  const unit = state.units.find(u=>u.x===tx && u.y===ty && u.owner===0);
+  if(unit){
+    state.selected = {type:'unit', id:unit.id};
+    updateSelectedBox();
+    redraw();
+    return;
+  }
+  // check city
+  const city = state.cities.find(c=>c.x===tx && c.y===ty);
+  if(city){
+    state.selected = {type:'city', id:city.id};
+    updateSelectedBox();
+    redraw();
+    return;
+  }
+  // check village
+  const village = state.villages.find(v=>v.x===tx && v.y===ty);
+  if(village){
+    state.selected = {type:'village', id:village.id};
+    updateSelectedBox();
+    redraw();
+    return;
+  }
+  // click on empty tile clears selection
+  state.selected = null;
+  updateSelectedBox();
+  redraw();
 }
 
-function handleRightClick(x,y){
+function handleRightClick(tx,ty){
   if(state.phase !== 'player'){ pushLog('Not your turn.'); return; }
+  if(!inBounds(tx,ty)) return;
   if(!state.selected){ pushLog('Select a unit or city first.'); return; }
   if(state.selected.type==='unit'){
     const unit = state.units.find(u=>u.id===state.selected.id);
-    if(!unit || unit.owner !== 0){ pushLog('Invalid unit.'); return; }
-    // find path using A*
-    const path = findPath(unit, {x,y});
-    if(!path){ pushLog('No path.'); return; }
-    // if final tile has enemy unit, perform attack immediately (simple)
-    const enemy = state.units.find(u=>u.x===x && u.y===y && u.owner!==unit.owner);
-    if(enemy && distance(unit.x,unit.y,x,y) <= unit.range){
-      // attack now
-      combat(unit, enemy);
+    if(!unit || unit.owner!==0){ pushLog('Invalid unit.'); return; }
+    // If selected unit is a transport and target tile has friendly land units adjacent, offer load/unload
+    const targetUnit = state.units.find(u=>u.x===tx && u.y===ty && u.owner!==unit.owner);
+    const targetCity = state.cities.find(c=>c.x===tx && c.y===ty);
+    const targetVillage = state.villages.find(v=>v.x===tx && v.y===ty);
+
+    // if target tile has enemy unit and in range -> attack
+    const enemyOnTile = state.units.find(u=>u.x===tx && u.y===ty && u.owner!==unit.owner);
+    if(enemyOnTile && distance(unit.x,unit.y,tx,ty) <= unit.range){
+      combat(unit, enemyOnTile);
       redraw(); updateUI();
       return;
     }
-    // otherwise move along path up to unit.moves
-    const steps = Math.min(unit.moves, path.length-1);
+
+    // loading: right-click on friendly transport adjacent to unit to load
+    if(unit.cat==='land'){
+      // find friendly transport adjacent to this tile
+      const adjTransport = state.units.find(u=>u.type==='transport' && u.owner===unit.owner && Math.abs(u.x - tx)<=1 && Math.abs(u.y - ty)<=1 && u.x===tx && u.y===ty);
+      // But user right-clicks the transport tile to load the unit that is selected; create simpler behavior:
+    }
+
+    // If selected unit is a transport and we right-click on a friendly land tile adjacent to a transport that contains loadable units, do unload
+    if(unit.type === 'transport'){
+      // if has loaded units and target tile is land and adjacent to water, unload units
+      const destTerrain = state.map[ty][tx].terrain;
+      if(destTerrain !== 'water' && unit.loaded.length > 0){
+        // unload as many as fit to adjacent tiles (or exact tile)
+        const toUnload = [...unit.loaded]; unit.loaded = [];
+        for(const uid of toUnload){
+          const lu = allUnitsById(uid);
+          if(!lu) continue;
+          // find empty adjacent tile
+          let placed=false;
+          const adj = neighbors(tx,ty);
+          adj.unshift({x:tx,y:ty});
+          for(const p of adj){
+            if(!tileHasUnit(p.x,p.y) && state.map[p.y][p.x].terrain!=='water'){
+              lu.x = p.x; lu.y = p.y; placed=true; break;
+            }
+          }
+          if(!placed){
+            // if nowhere to place, drop at transport's tile (if land) or first adjacent land
+            lu.x = unit.x; lu.y = unit.y;
+          }
+        }
+        pushLog('Units unloaded from transport.');
+        redraw(); updateUI();
+        return;
+      }
+    }
+
+    // Otherwise move unit with pathfinding, respecting unit category
+    const path = findPath(unit, {x:tx,y:ty});
+    if(!path){ pushLog('No path.'); return; }
+    const steps = Math.min(unit.moves, path.length - 1);
     const dest = path[steps];
+    // move
     unit.x = dest.x; unit.y = dest.y; unit.moves -= steps;
-    pushLog(`${UNIT_TYPES[unit.type].name} moved to (${unit.x},${unit.y})`);
-    // capture city if moved onto neutral/enemy city
+    pushLog(`${UNIT_DEF[unit.type].name} moved to (${unit.x},${unit.y})`);
+    // after move, if on enemy city or neutral city or village -> capture progression
     const city = state.cities.find(c=>c.x===unit.x && c.y===unit.y && c.owner!==unit.owner);
     if(city){
       city.captureProgress = (city.captureProgress || 0) + 1;
-      pushLog(`Capturing city... (${city.captureProgress}/3)`);
-      if(city.captureProgress >= 3){ // held for 3 turns/moves
+      pushLog(`Capturing city... (${city.captureProgress}/${CITY_CAPTURE_HOLD_TURNS})`);
+      if(city.captureProgress >= CITY_CAPTURE_HOLD_TURNS){
+        city.owner = unit.owner; city.captureProgress = 0;
         pushLog(`${state.players[unit.owner].name} captured a city!`);
-        city.owner = unit.owner; city.captureProgress=0;
       }
     }
+    const village = state.villages.find(v=>v.x===unit.x && v.y===unit.y && v.owner!==unit.owner);
+    if(village){
+      village.captureProgress = (village.captureProgress||0) + 1;
+      pushLog(`Capturing village... (${village.captureProgress}/${VILLAGE_CAPTURE_HOLD})`);
+      if(village.captureProgress >= VILLAGE_CAPTURE_HOLD){
+        village.owner = unit.owner; pushLog(`${state.players[unit.owner].name} captured a village!`);
+      }
+    }
+
     redraw(); updateUI();
   } else if(state.selected.type==='city'){
-    pushLog('Use a unit to move/attack.'); return;
+    pushLog('Right-click with unit selected to move/attack.');
+  } else if(state.selected.type==='village'){
+    pushLog('Select a unit to capture villages.');
   }
 }
 
-/* ---------------------------
-   PATHFINDING (A*)
-   --------------------------- */
-function distance(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
+/* =========================
+   PATHFINDING (A*), movement rules
+   ========================= */
+function inBounds(x,y){ return x>=0 && y>=0 && x<TILE_COUNT && y<TILE_COUNT; }
+function neighbors(x,y){
+  const out=[];
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
+    const nx=x+d[0], ny=y+d[1];
+    if(inBounds(nx,ny)) out.push({x:nx,y:ny});
+  });
+  return out;
+}
+
+function tileHasUnit(x,y){
+  return state.units.some(u=>u.x===x && u.y===y);
+}
+
+function passableFor(unit, x,y){
+  if(!inBounds(x,y)) return false;
+  const terrain = state.map[y][x].terrain;
+  if(unit.cat==='land' && terrain==='water') return false;
+  if(unit.cat==='navy' && terrain!=='water') return false;
+  return true;
+}
 
 function findPath(unit, goal){
-  // A* on grid with terrain costs, respects unit category (navy can't go on land etc)
-  const start = {x:unit.x,y:unit.y};
-  const passable = (x,y)=>{
-    if(!inBounds(x,y)) return false;
-    const t = state.map[y][x].terrain;
-    if(unit.cat==='navy' && t!=='water') return false;
-    if(unit.cat!=='navy' && t==='water') return false;
-    return true;
-  };
-  // simple 4-directional
+  // A* with simple move cost from TERRAIN.move
+  const start = {x:unit.x, y:unit.y};
+  if(!inBounds(goal.x, goal.y)) return null;
+  const passable = (x,y)=> passableFor(unit,x,y);
   const open = new Map();
   const closed = new Set();
   function key(p){ return `${p.x},${p.y}`; }
-  open.set(key(start), {x:start.x,y:start.y,g:0,h:distance(start.x,start.y,goal.x,goal.y),f:distance(start.x,start.y,goal.x,goal.y),parent:null});
-  const maxIter = 10000;
-  let iter=0;
-  while(open.size>0 && iter<maxIter){
+  open.set(key(start), {...start, g:0, f:heuristic(start,goal), parent:null});
+  let iter=0, maxIter=2000;
+  while(open.size>0 && iter < maxIter){
     iter++;
-    // take lowest f
-    let curKey; let cur;
-    for(const [k,v] of open) { if(!cur || v.f < cur.f) { cur = v; curKey = k; } }
-    open.delete(curKey); closed.add(curKey);
-    if(cur.x===goal.x && cur.y===goal.y) {
-      // reconstruct path
+    // get lowest f
+    let curK, cur;
+    for(const [k,v] of open){ if(!cur || v.f < cur.f) { cur=v; curK=k; } }
+    open.delete(curK);
+    closed.add(curK);
+    if(cur.x===goal.x && cur.y===goal.y){
+      // reconstruct
       const path = [];
       let p = cur;
       while(p){ path.unshift({x:p.x,y:p.y}); p = p.parent; }
       return path;
     }
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    for(const d of dirs){
-      const nx=cur.x+d[0], ny=cur.y+d[1];
-      const nk = key({x:nx,y:ny});
-      if(!inBounds(nx,ny) || closed.has(nk) || !passable(nx,ny)) continue;
-      // movement cost: base 1 * terrain multiplier
-      const terr = state.map[ny][nx].terrain;
-      const cost = TERRAIN[terr].move;
+    // neighbors
+    for(const n of neighbors(cur.x, cur.y)){
+      const nk = key(n);
+      if(closed.has(nk)) continue;
+      if(!passable(n.x,n.y)) continue;
+      const terrain = state.map[n.y][n.x].terrain;
+      const cost = (terrain==='water'?1 : (terrain==='mountain'?3:(terrain==='forest'?1.5:1)));
       const g = cur.g + cost;
-      const h = distance(nx,ny,goal.x,goal.y);
+      const h = heuristic(n,goal);
       const f = g + h;
       if(open.has(nk)){
-        const existing = open.get(nk);
-        if(g < existing.g) open.set(nk, {x:nx,y:ny,g,h,f,parent:cur});
+        const ex = open.get(nk);
+        if(g < ex.g) open.set(nk, {x:n.x,y:n.y,g,f,h,parent:cur});
       } else {
-        open.set(nk, {x:nx,y:ny,g,h,f,parent:cur});
+        open.set(nk, {x:n.x,y:n.y,g,f,h,parent:cur});
       }
     }
   }
   return null;
 }
 
-/* ---------------------------
+function heuristic(a,b){
+  return Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+}
+
+/* =========================
    COMBAT
-   --------------------------- */
+   ========================= */
+function distance(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
+
 function combat(attacker, defender){
-  const atk = UNIT_TYPES[attacker.type].atk;
-  const def = UNIT_TYPES[defender.type].def;
-  // simple damage calc
-  const hit = Math.max(1, atk - defender.def);
-  defender.hp -= hit;
-  pushLog(`${UNIT_TYPES[attacker.type].name} hit ${UNIT_TYPES[defender.type].name} for ${hit} damage`);
+  if(!attacker || !defender) return;
+  const atk = Math.max(1, UNIT_DEF[attacker.type].atk);
+  const def = Math.max(0, UNIT_DEF[defender.type].def);
+  const dmg = Math.max(1, atk - def);
+  defender.hp -= dmg;
+  pushLog(`${UNIT_DEF[attacker.type].name} hit ${UNIT_DEF[defender.type].name} for ${dmg}`);
   if(defender.hp <= 0){
-    pushLog(`${UNIT_TYPES[defender.type].name} destroyed`);
-    // remove defender
-    state.units = state.units.filter(u=>u.id!==defender.id);
+    pushLog(`${UNIT_DEF[defender.type].name} destroyed`);
+    state.units = state.units.filter(u => u.id !== defender.id);
   } else {
     // counterattack if in range
     if(distance(attacker.x,attacker.y,defender.x,defender.y) <= defender.range){
-      const ch = Math.max(1, defender.atk - attacker.def);
-      attacker.hp -= ch;
-      pushLog(`${UNIT_TYPES[defender.type].name} countered for ${ch}`);
-      if(attacker.hp <= 0){ pushLog(`${UNIT_TYPES[attacker.type].name} destroyed`); state.units = state.units.filter(u=>u.id!==attacker.id); }
+      const counter = Math.max(1, UNIT_DEF[defender.type].atk - UNIT_DEF[attacker.type].def);
+      attacker.hp -= counter;
+      pushLog(`${UNIT_DEF[defender.type].name} countered for ${counter}`);
+      if(attacker.hp <= 0){ pushLog(`${UNIT_DEF[attacker.type].name} destroyed`); state.units = state.units.filter(u => u.id !== attacker.id); }
     }
   }
 }
 
-/* ---------------------------
-   UPKEEP & RESOURCE COLLECTION
-   --------------------------- */
-function collectResources(){
-  // collect from cities
-  for(const city of state.cities){
-    if(city.owner===null) continue;
-    const p = state.players[city.owner];
-    for(const r of RESOURCES){
-      const amt = Math.floor((CITY_BASE[r]||0) * city.level);
-      if(!p.resources[r]) p.resources[r]=0;
-      p.resources[r] += amt;
+/* =========================
+   TRANSPORT LOGIC
+   ========================= */
+function loadUnitIntoTransport(landUnit, transport){
+  if(transport.type !== 'transport') return false;
+  if(transport.owner !== landUnit.owner) return false;
+  if(transport.loaded.length >= transport.capacity) return false;
+  // remove from map? We will mark by moving unit off-map (x,y = transport.x,transport.y) and store its id
+  transport.loaded.push(landUnit.id);
+  // mark unit as "loaded"
+  landUnit.x = transport.x;
+  landUnit.y = transport.y;
+  pushLog(`${UNIT_DEF[landUnit.type].name} loaded into transport.`);
+  return true;
+}
+
+function unloadFromTransport(transport, atX, atY){
+  // attempt to place loaded units to adjacent land tiles
+  if(transport.type !== 'transport') return;
+  const toUnload = transport.loaded.slice();
+  transport.loaded = [];
+  for(const uid of toUnload){
+    const unit = allUnitsById(uid);
+    if(!unit) continue;
+    let placed=false;
+    const adj = neighbors(atX, atY);
+    adj.unshift({x:atX,y:atY});
+    for(const p of adj){
+      if(state.map[p.y][p.x].terrain !== 'water' && !tileHasUnit(p.x,p.y)){
+        unit.x = p.x; unit.y = p.y; placed=true; break;
+      }
     }
-    // nearby resource nodes add small bonus
-    const radius=2;
-    for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++){
+    if(!placed){
+      // place on nearest valid tile
+      for(let r=1;r<5 && !placed;r++){
+        for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+          const nx=atX+dx, ny=atY+dy;
+          if(inBounds(nx,ny) && state.map[ny][nx].terrain!=='water' && !tileHasUnit(nx,ny)){ unit.x=nx; unit.y=ny; placed=true; break;}
+        }
+        if(placed) break;
+      }
+    }
+  }
+  pushLog('Transport unloaded.');
+}
+
+/* =========================
+   UPKEEP & RESOURCE COLLECTION
+   ========================= */
+function collectResources(){
+  // reset nothing; for each city, produce resources proportional to level
+  for(const city of state.cities){
+    if(city.owner === null) continue;
+    const owner = state.players[city.owner];
+    for(const rk of RESOURCE_KEYS){
+      const amt = Math.floor((CITY_BASE_PROD[rk] || 0) * city.level);
+      owner.resources[rk] = (owner.resources[rk] || 0) + amt;
+    }
+    // nearby nodes give small bonuses
+    const r=2;
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
       const nx=city.x+dx, ny=city.y+dy;
       if(inBounds(nx,ny) && state.map[ny][nx].resource){
         const res = state.map[ny][nx].resource;
-        if(!p.resources[res]) p.resources[res]=0;
-        p.resources[res] += 1 * city.level;
+        owner.resources[res] = (owner.resources[res]||0) + 1 * city.level;
       }
     }
   }
-  // upkeep - subtract food from all units per owner
-  const upKeepByOwner = {};
+  // villages give small gold each turn for owner
+  for(const v of state.villages) if(v.owner!==null){
+    state.players[v.owner].resources.gold += 2;
+  }
+  // upkeep: subtract food from each player's units
+  const upkeep = [0,0];
   for(const u of state.units){
-    const uf = u.upkeep || {food:0};
-    if(uf.food){
-      upKeepByOwner[u.owner] = (upKeepByOwner[u.owner]||0) + uf.food;
-    }
+    const up = u.upkeep && u.upkeep.food ? u.upkeep.food : 0;
+    upkeep[u.owner] += up;
   }
   for(const pid of [0,1]){
-    if(upKeepByOwner[pid]){
-      state.players[pid].resources.food -= upKeepByOwner[pid];
-      pushLog(`${state.players[pid].name} paid ${upKeepByOwner[pid]} food upkeep`);
-      // if food negative, start attrition
-      if(state.players[pid].resources.food < 0){
-        state.players[pid].resources.food = 0;
-        // damage units
-        state.units.filter(u=>u.owner===pid).forEach(u=>{ u.hp -= 2; if(u.hp<=0) pushLog(`${UNIT_TYPES[u.type].name} starved and died`); });
-        state.units = state.units.filter(u=>u.hp>0);
-      }
+    state.players[pid].resources.food -= upkeep[pid];
+    if(upkeep[pid] > 0) pushLog(`${state.players[pid].name} paid ${upkeep[pid]} food upkeep.`);
+    if(state.players[pid].resources.food < 0){
+      // attrition
+      state.players[pid].resources.food = 0;
+      // damage some units
+      for(const u of state.units.filter(uu=>uu.owner===pid)){ u.hp -= 2; }
+      state.units = state.units.filter(uu=>uu.hp>0);
+      pushLog(`${state.players[pid].name} suffered attrition due to lack of food.`);
     }
   }
 }
 
-/* ---------------------------
-   END TURN / AI
-   --------------------------- */
+/* =========================
+   TRAIN & UPGRADE
+   ========================= */
+function canAfford(playerId, type){
+  const cost = UNIT_DEF[type].cost;
+  const p = state.players[playerId];
+  for(const k in cost) if((p.resources[k] || 0) < cost[k]) return false;
+  return true;
+}
+function spendCost(playerId, type){
+  const cost = UNIT_DEF[type].cost;
+  const p = state.players[playerId];
+  for(const k in cost) p.resources[k] = (p.resources[k]||0) - cost[k];
+}
+
+/* =========================
+   UTILITIES
+   ========================= */
+function allUnitsById(id){
+  return state.units.find(u=>u.id===id);
+}
+
+/* =========================
+   END TURN & AI
+   ========================= */
 function endTurn(){
   if(state.phase !== 'player') return;
   // reset moves
@@ -569,42 +836,98 @@ function endTurn(){
   collectResources();
   state.turn++;
   state.phase = 'ai';
-  pushLog('Turn ended. Rival thinking...');
+  pushLog('Player turn ended. Rival thinking...');
   updateUI();
-  // run AI after small delay
-  setTimeout(()=>{ aiTurn(); }, 400);
+  setTimeout(()=>{ aiProcess(); }, 400);
 }
 
-function aiTurn(){
-  // simple AI: collect/buy units if has resources; move units toward nearest enemy or neutral city; attack if adjacent
-  // Collect already done at endTurn
+function aiProcess(){
+  // advanced-ish AI:
+  // - evaluate economy and train units (land/navy/transport) depending on geography and threats
+  // - use transports to move armies across water to player islands
+  // - move units towards vulnerable targets (player cities with low defense, villages)
+  // - attack when advantageous
   const ai = state.players[1];
-  // Try to train a unit at their cities if resources allow
-  for(const city of state.cities.filter(c=>c.owner===1)){
-    // If AI lacks units, attempt to build infantry or navy depending on nearby terrain
-    const nearWater = checkNearbyWater(city.x,city.y,3);
-    const tryType = nearWater ? 'frigate' : 'infantry';
-    if(canAfford(1, tryType)){
-      spendCost(1, tryType);
-      const newU = createUnit(tryType,1, city.x+1, city.y);
-      state.units.push(newU);
-      pushLog('Rival trained a ' + UNIT_TYPES[tryType].name);
+
+  // Training logic: check cities owned by AI
+  const aiCities = state.cities.filter(c=>c.owner===1);
+  for(const city of aiCities){
+    // compute simple composition: if near water, favor transports + navy, else land
+    const nearWater = nearbyTerrainCount(city.x,city.y,'water',5) > 6;
+    let toTrain = 'infantry';
+    if(nearWater && Math.random()<0.5) toTrain = 'transport';
+    else {
+      // based on resources, train mixed
+      const r = Math.random();
+      if(r < 0.25) toTrain = 'tank';
+      else if(r < 0.45) toTrain = 'artillery';
+      else toTrain = 'infantry';
+    }
+    if(canAfford(1,toTrain) && Math.random()<0.6){
+      spendCost(1,toTrain);
+      createUnit(toTrain,1, city.x+1, city.y);
+      pushLog('Rival trained ' + UNIT_DEF[toTrain].name);
     }
   }
-  // Move each AI unit toward nearest enemy city or player unit
-  for(const u of state.units.filter(u=>u.owner===1)){
-    // find target: enemy city first, else player unit
+
+  // Build invasion groups: find transports and load nearest land units, then move to player islands
+  const transports = state.units.filter(u=>u.owner===1 && u.type==='transport');
+  const aiLandUnits = state.units.filter(u=>u.owner===1 && u.cat==='land');
+  for(const t of transports){
+    // if transport empty, try to load nearby land units
+    if(t.loaded.length < t.capacity){
+      const nearbyLand = aiLandUnits.find(lu => distance(lu.x,lu.y,t.x,t.y) <= 2 && !t.loaded.includes(lu.id));
+      if(nearbyLand){
+        t.loaded.push(nearbyLand.id);
+        pushLog('Rival loaded ' + UNIT_DEF[nearbyLand.type].name + ' into transport.');
+      }
+    } else {
+      // find a target: player city that is not heavily defended
+      const targets = state.cities.filter(c=>c.owner===0);
+      if(targets.length > 0){
+        // choose the one with lowest nearby defense
+        let best=null, bestScore=9999;
+        for(const tg of targets){
+          const defense = state.units.filter(u=>u.owner===0 && distance(u.x,u.y,tg.x,tg.y) <= 4).length;
+          const d = distance(t.x,t.y,tg.x,tg.y) + defense*6;
+          if(d < bestScore){ bestScore=d; best=tg; }
+        }
+        if(best){
+          // path transport across water to nearest coastal tile of target
+          const seaGoal = nearestSeaTileTo(best.x,best.y);
+          if(seaGoal){
+            // move transport toward seaGoal
+            const path = findPath(t, seaGoal);
+            if(path && path.length>1){
+              const steps = Math.min(t.moves, path.length-1);
+              const dest = path[steps];
+              t.x = dest.x; t.y = dest.y; t.moves -= steps;
+              pushLog('Rival moved a transport.');
+            }
+            // attempt unload if adjacent and close to land target
+            if(distance(t.x,t.y,best.x,best.y) <= 2){
+              // unload onto nearest land tile
+              unloadFromTransport(t, best.x, best.y);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Move other AI units: simple: move toward nearest player city or unit
+  for(const u of state.units.filter(u=>u.owner===1 && u.type !== 'transport')){
+    // choose target
     let target = null;
-    let bestd=9999;
-    for(const city of state.cities.filter(c=>c.owner!==1)){
-      const d = distance(u.x,u.y,city.x,city.y);
-      if(d<bestd){ bestd=d; target={x:city.x,y:city.y}; }
+    let bestd = 9999;
+    // Prefer cities owned by player
+    for(const c of state.cities.filter(cc=>cc.owner===0)){
+      const d = distance(u.x,u.y,c.x,c.y);
+      if(d < bestd){ bestd=d; target={x:c.x,y:c.y}; }
     }
     if(!target){
-      for(const pu of state.units.filter(pu=>pu.owner===0)){
-        const d = distance(u.x,u.y,pu.x,pu.y);
-        if(d<bestd){ bestd=d; target={x:pu.x,y:pu.y}; }
-      }
+      const enemyUnit = state.units.find(uu=>uu.owner===0);
+      if(enemyUnit) target = {x:enemyUnit.x, y:enemyUnit.y};
     }
     if(target){
       const path = findPath(u, target);
@@ -612,151 +935,180 @@ function aiTurn(){
         const steps = Math.min(u.moves, path.length-1);
         const dest = path[steps];
         u.x = dest.x; u.y = dest.y; u.moves -= steps;
-        // if moved onto enemy unit -> attack
-        const enemy = state.units.find(z=>z.x===u.x && z.y===u.y && z.owner===0);
-        if(enemy && distance(u.x,u.y,enemy.x,enemy.y) <= u.range) combat(u,enemy);
-        // if moved onto city -> capture progress
-        const city = state.cities.find(c=>c.x===u.x && c.y===u.y && c.owner!==1);
-        if(city){
-          city.captureProgress = (city.captureProgress||0) + 1;
-          if(city.captureProgress >= 3){ city.owner = 1; city.captureProgress=0; pushLog('Rival captured a city!'); }
+        // attack entrance if enemy found
+        const enemy = state.units.find(e=>e.x===u.x && e.y===u.y && e.owner===0);
+        if(enemy && distance(u.x,u.y,enemy.x,enemy.y) <= u.range){
+          combat(u, enemy);
         }
       }
+    } else {
+      // wander
+      const rdx = rand(3)-1, rdy = rand(3)-1;
+      const nx = clamp(u.x+rdx,0,TILE_COUNT-1), ny = clamp(u.y+rdy,0,TILE_COUNT-1);
+      if(passableFor(u,nx,ny)) { u.x = nx; u.y = ny; }
     }
   }
 
-  // reset moves for AI (for simplicity)
+  // reset moves
   state.units.forEach(u => u.moves = u.maxMoves);
 
-  // check defeat
-  checkDefeat();
-
-  // back to player
+  // end AI turn
   state.phase = 'player';
-  pushLog('Your turn.');
-  updateUI();
-  redraw();
+  pushLog('Rival turn complete. Your move.');
+  updateUI(); redraw();
+  checkVictory();
 }
 
-/* ---------------------------
-   AI helpers
-   --------------------------- */
-function checkNearbyWater(x,y,r){
-  for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-    const nx=x+dx, ny=y+dy;
-    if(inBounds(nx,ny) && state.map[ny][nx].terrain==='water') return true;
+/* =========================
+   AI Helper functions
+   ========================= */
+function nearbyTerrainCount(cx,cy,terrainType, radius){
+  let count=0;
+  for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++){
+    const nx=cx+dx, ny=cy+dy;
+    if(inBounds(nx,ny) && state.map[ny][nx].terrain===terrainType) count++;
   }
-  return false;
+  return count;
 }
 
-/* ---------------------------
-   TRAIN / UPGRADE / AFFORD
-   --------------------------- */
-function canAfford(playerId, type){
-  const cost = UNIT_TYPES[type].cost;
-  const p = state.players[playerId];
-  for(const k in cost) if((p.resources[k]||0) < cost[k]) return false;
-  return true;
-}
-function spendCost(playerId, type){
-  const cost = UNIT_TYPES[type].cost;
-  const p = state.players[playerId];
-  for(const k in cost) p.resources[k] = (p.resources[k]||0) - cost[k];
+function nearestSeaTileTo(x,y){
+  // find nearest water tile adjacent to any land tile of target island
+  // simple approach: search outward for water tile that has passable route for naval units
+  for(let r=1;r<20;r++){
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      const nx=x+dx, ny=y+dy;
+      if(inBounds(nx,ny) && state.map[ny][nx].terrain==='water'){
+        // ensure it has some water neighbors (not isolated)
+        return {x:nx,y:ny};
+      }
+    }
+  }
+  return null;
 }
 
-/* ---------------------------
-   UI Buttons
-   --------------------------- */
-document.getElementById('newBtn').onclick = ()=> newGame();
-document.getElementById('endBtn').onclick = ()=> endTurn();
-document.getElementById('nextAI').onclick = ()=> { if(state.phase==='player'){ endTurn(); } };
+/* =========================
+   CHECK VICTORY / LOSS
+   ========================= */
+function checkVictory(){
+  // if a player has no cities or no units -> lose
+  for(const pid of [0,1]){
+    const cities = state.cities.filter(c=>c.owner===pid);
+    const units = state.units.filter(u=>u.owner===pid && u.type!=='transport');
+    if(cities.length===0 || units.length===0){
+      const winner = pid===0 ? 'Rival' : 'Player';
+      pushLog(`${state.players[pid].name} eliminated. ${winner} wins!`);
+      state.phase = 'end';
+      alert(`${winner} wins!`);
+      return;
+    }
+  }
+}
+
+/* =========================
+   UI: Train / Upgrade / Save / Load
+   ========================= */
+document.getElementById('newGameBtn').onclick = ()=>{ newGame(); };
+document.getElementById('endTurnBtn').onclick = ()=>{ endTurn(); };
+document.getElementById('saveBtn').onclick = ()=>{ localStorage.setItem('empireforge.save', JSON.stringify(state)); pushLog('Saved game to localStorage.'); };
+document.getElementById('loadBtn').onclick = ()=>{ const s=localStorage.getItem('empireforge.save'); if(s){ state=JSON.parse(s); pushLog('Loaded save.'); redraw(); updateUI(); } else pushLog('No save found.'); };
 
 document.getElementById('trainBtn').onclick = ()=>{
   if(!state.selected || state.selected.type!=='city'){ pushLog('Select one of your cities to train units.'); return; }
-  const city = state.selected.city;
-  if(city.owner !== 0){ pushLog('You do not own that city.'); return; }
-  const type = document.getElementById('trainType').value;
-  if(!canAfford(0,type)){ pushLog('Not enough resources.'); return; }
+  const city = state.cities.find(c=>c.id===state.selected.id);
+  if(!city || city.owner!==0){ pushLog('You must select a city you own'); return; }
+  const type = document.getElementById('trainSelect').value;
+  if(!canAfford(0,type)){ pushLog('Not enough resources to train '+type); return; }
   spendCost(0,type);
-  const spawnX = Math.min(TILE_COUNT-1, city.x+1);
-  const spawnY = city.y;
-  const u = createUnit(type,0,spawnX,spawnY);
-  state.units.push(u);
-  pushLog(`Trained ${UNIT_TYPES[type].name} at city.`);
+  createUnit(type, 0, city.x+1, city.y);
+  pushLog('Trained ' + UNIT_DEF[type].name);
   updateUI(); redraw();
 };
 
 document.getElementById('upgradeBtn').onclick = ()=>{
   if(!state.selected || state.selected.type!=='city'){ pushLog('Select one of your cities to upgrade.'); return; }
-  const city = state.selected.city;
+  const city = state.cities.find(c=>c.id===state.selected.id);
   if(city.owner !== 0){ pushLog('You do not own that city.'); return; }
-  // cost scales with level
-  const costMult = Math.floor(30 * Math.pow(CITY_UPGRADE_COST_MULT, city.level));
-  if((state.players[0].resources.gold||0) < costMult){ pushLog('Not enough gold to upgrade.'); return; }
-  state.players[0].resources.gold -= costMult;
+  const cost = Math.floor(60 * Math.pow(CITY_UPGRADE_MULT, city.level));
+  if((state.players[0].resources.gold||0) < cost){ pushLog('Not enough gold to upgrade.'); return; }
+  state.players[0].resources.gold -= cost;
   city.level++;
-  pushLog(`City upgraded to level ${city.level}`);
+  pushLog('City upgraded to level ' + city.level);
   updateUI(); redraw();
 };
 
-/* ---------------------------
-   SELECTED INFO & UI update
-   --------------------------- */
-function updateSelectedInfo(){
-  const el = document.getElementById('selectedInfo');
-  if(!state.selected){ el.textContent = 'None'; return; }
+/* =========================
+   UI Helpers
+   ========================= */
+function updateSelectedBox(){
+  const el = document.getElementById('selBox');
+  if(!state.selected){ el.innerHTML = 'Selected: None'; return; }
   if(state.selected.type==='unit'){
-    const u = state.units.find(x=>x.id===state.selected.id);
-    if(!u){ el.textContent = 'None'; return; }
-    el.innerHTML = `${UNIT_TYPES[u.type].name} • HP ${u.hp}/${UNIT_TYPES[u.type].hp} • Moves ${u.moves}/${u.maxMoves} • Owner: ${state.players[u.owner].name}`;
-  } else {
-    const c = state.selected.city;
-    el.innerHTML = `City L${c.level} • Owner: ${state.players[c.owner].name} • Capture: ${c.captureProgress||0}/3`;
+    const u = state.units.find(uu=>uu.id===state.selected.id);
+    if(!u){ el.innerHTML='Selected: None'; return; }
+    el.innerHTML = `<b>${UNIT_DEF[u.type].name}</b> • HP ${u.hp}/${u.maxHp} • Moves ${u.moves}/${u.maxMoves} • Owner: ${state.players[u.owner].name}`;
+    if(u.type==='transport') el.innerHTML += `<div class="mini">Loaded: ${u.loaded.length}/${u.capacity}</div>`;
+  } else if(state.selected.type==='city'){
+    const c = state.cities.find(cc=>cc.id===state.selected.id);
+    el.innerHTML = `<b>City (L${c.level})</b><div class="mini">Owner: ${c.owner===null ? 'Neutral' : state.players[c.owner].name}</div>`;
+  } else if(state.selected.type==='village'){
+    const v = state.villages.find(vv=>vv.id===state.selected.id);
+    el.innerHTML = `<b>Village</b><div class="mini">Owner: ${v.owner===null ? 'Neutral' : state.players[v.owner].name}</div>`;
   }
 }
 
-function updateResourcePanel(){
+function updateResourceDisplay(){
   const p = state.players[0];
-  const panel = document.getElementById('resourcePanel');
-  panel.innerHTML = RESOURCES.map(r=>`<div class="res">${r.toUpperCase()}: ${p.resources[r]||0}</div>`).join('');
+  const el = document.getElementById('resourceDisplay');
+  el.innerHTML = RESOURCE_KEYS.map(k=>`<div class="res">${k.toUpperCase()}: ${p.resources[k]||0}</div>`).join('');
 }
 
 function updateUI(){
-  updateResourcePanel();
-  updateSelectedInfo();
+  updateResourceDisplay();
+  updateSelectedBox();
   redraw();
 }
 
-/* ---------------------------
-   GAME END CHECK
-   --------------------------- */
-function checkDefeat(){
-  // if a player has no cities or no units, they lose
-  for(const pid of [0,1]){
-    const cities = state.cities.filter(c=>c.owner===pid);
-    const units = state.units.filter(u=>u.owner===pid);
-    if(cities.length===0 || units.length===0){
-      pushLog(`${state.players[1-pid].name} wins!`);
-      // freeze game
-      state.phase = 'end';
-      alert(`${state.players[1-pid].name} wins!`);
-    }
-  }
+/* =========================
+   Afford helpers
+   ========================= */
+function canAfford(playerId, type){
+  const cost = UNIT_DEF[type].cost || {};
+  const p = state.players[playerId];
+  for(const k in cost) if((p.resources[k]||0) < cost[k]) return false;
+  return true;
+}
+function spendCost(playerId, type){
+  const cost = UNIT_DEF[type].cost || {};
+  const p = state.players[playerId];
+  for(const k in cost) p.resources[k] = (p.resources[k]||0) - cost[k];
 }
 
-/* ---------------------------
-   INITIALIZE
-   --------------------------- */
+/* =========================
+   Misc helpers & init
+   ========================= */
+function allUnits(){ return state.units; }
+
+function distance(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
+
+function redrawAndUpdate(){
+  redraw();
+  updateUI();
+}
+
+/* =========================
+   INITIALIZE GAME
+   ========================= */
 newGame();
 updateUI();
 redraw();
 
-/* ---------------------------
-   OPTIONAL: save/load (localStorage)
-   --------------------------- */
+/* =========================
+   Keyboard Shortcuts
+   ========================= */
 window.addEventListener('keydown', (e)=>{
-  if(e.key === 's' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); localStorage.setItem('dominion_save', JSON.stringify(state)); pushLog('Saved game.'); }
-  if(e.key === 'l' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); const s=localStorage.getItem('dominion_save'); if(s){ state = JSON.parse(s); pushLog('Loaded save.'); updateUI(); } else pushLog('No save found'); }
+  if(e.key === 'Enter') endTurn();
+  if(e.key === 's' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); localStorage.setItem('empireforge.save', JSON.stringify(state)); pushLog('Saved (shortcut).'); }
+  if(e.key === 'l' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); const s=localStorage.getItem('empireforge.save'); if(s){ state = JSON.parse(s); pushLog('Loaded (shortcut).'); redraw(); updateUI(); } else pushLog('No save'); }
 });
 
 </script>
