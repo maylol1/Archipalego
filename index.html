@@ -3,356 +3,762 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Archipelago — a tiny creative strategic game</title>
+<title>Dominion Isles — Tiny Strategy Prototype</title>
 <style>
-:root{--bg:#0b1220;--panel:#0f1724;--accent:#7dd3fc;--muted:#94a3b8;--good:#86efac}
-*{box-sizing:border-box;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial}
-html,body{height:100%;margin:0;background:linear-gradient(180deg,#071021 0%, #071827 60%);color:#e6eef8}
-.app{display:grid;grid-template-columns:1fr 340px;gap:14px;height:100vh;padding:14px}
-.panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:12px;padding:12px;box-shadow:0 6px 24px rgba(4,6,12,0.6)}
-.canvas-wrap{position:relative;border-radius:12px;overflow:hidden}
-canvas{display:block;width:100%;height:100%;background:linear-gradient(180deg,#07314b 0%, #022031 70%)}
-.hud{position:absolute;left:12px;top:12px;background:rgba(2,6,12,0.45);padding:8px;border-radius:8px;backdrop-filter: blur(4px)}
-.hud small{color:var(--muted);display:block}
-.controls{display:flex;flex-direction:column;gap:8px}
-.btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:10px;color:var(--accent);cursor:pointer}
-.btn.secondary{color:var(--muted);border-style:dashed}
-.title{font-weight:700;font-size:18px;margin-bottom:6px}
-.stat{display:flex;align-items:center;gap:8px}
-.side{display:flex;flex-direction:column;gap:12px}
-.log{height:220px;overflow:auto;padding:8px;background:rgba(0,0,0,0.15);border-radius:8px}
-.small{font-size:13px;color:var(--muted)}
-.legend{display:flex;flex-wrap:wrap;gap:8px}
-.legend .item{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);font-size:13px}
-footer{font-size:12px;color:var(--muted);}
-.instructions{font-size:13px;line-height:1.4}
-@media(max-width:900px){.app{grid-template-columns:1fr;grid-auto-rows:1fr;}}
+  :root{
+    --bg:#0b1220;--panel:#0f1724;--accent:#7dd3fc;--muted:#94a3b8;
+    --p0:#6ee7b7;--p1:#fb7185;
+  }
+  html,body{height:100%;margin:0;background:#071021;color:#dbeafe;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .app{display:grid;grid-template-columns:1fr 340px;gap:12px;height:100vh;padding:12px}
+  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:10px;padding:12px;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+  canvas{display:block;width:100%;height:calc(100vh - 48px);border-radius:8px;background:#042233}
+  .side{display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;gap:8px;align-items:center}
+  button{background:#062635;border:1px solid rgba(255,255,255,0.03);color:var(--accent);padding:8px 10px;border-radius:8px;cursor:pointer}
+  .muted{color:var(--muted);font-size:13px}
+  .resources{display:flex;gap:8px;flex-wrap:wrap}
+  .res{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:8px;font-size:13px}
+  .log{height:220px;overflow:auto;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;font-size:13px}
+  .hud{position:absolute;left:16px;top:16px;padding:8px;background:rgba(0,0,0,0.4);border-radius:8px}
+  .small{font-size:13px;color:var(--muted)}
+  .title{font-weight:700;font-size:18px;margin-bottom:6px}
+  .bar{height:8px;background:#04161d;border-radius:6px;overflow:hidden}
+  .hp{height:100%;background:linear-gradient(90deg,#fca5a5,#86efac)}
+  @media(max-width:900px){.app{grid-template-columns:1fr;grid-auto-rows:auto} canvas{height:60vh}}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="panel canvas-wrap" id="gamePanel">
-    <canvas id="game" width="1200" height="720"></canvas>
-    <div class="hud" id="hud">
-      <div class="stat"><div id="turn">Turn 1</div><small id="phase">Player</small></div>
-      <div class="stat small"><span>Resources:</span> <b id="res">0</b></div>
+  <div class="panel" style="position:relative;padding:10px;">
+    <div class="hud small" id="topHud">Turn 1 — Player • Phase: Player</div>
+    <canvas id="mapCanvas"></canvas>
+    <div style="position:absolute;right:16px;bottom:18px;background:rgba(0,0,0,0.45);padding:8px;border-radius:8px;">
+      <div class="small">Selected:</div>
+      <div id="selectedInfo" class="small">None</div>
     </div>
   </div>
 
   <aside class="panel side">
     <div>
-      <div class="title">Archipelago</div>
-      <div class="small">A tiny creative and strategic turn-based game built for GitHub Pages. Capture islands, gather resources, expand your influence, and outwit rival captains.</div>
+      <div class="title">Dominion Isles</div>
+      <div class="muted">Capture and upgrade cities, manage resources and build an army to crush the rival AI.</div>
     </div>
 
-    <div class="controls">
-      <button class="btn" id="newBtn">New Game</button>
-      <button class="btn secondary" id="saveBtn">Save</button>
-      <button class="btn secondary" id="loadBtn">Load</button>
-      <button class="btn secondary" id="exportBtn">Export Map (JSON)</button>
+    <div class="resources" id="resourcePanel"></div>
+
+    <div class="row">
+      <button id="newBtn">New Game</button>
+      <button id="endBtn">End Turn</button>
+      <button id="nextAI" title="Run AI turn (debug)">Run AI</button>
     </div>
 
-    <div>
-      <div class="small">Legend</div>
-      <div class="legend" id="legend">
-        <div class="item">🏝️ Land</div>
-        <div class="item">🌊 Water</div>
-        <div class="item">⛵ Ship</div>
-        <div class="item">🏰 Outpost</div>
-        <div class="item">💎 Resource</div>
-      </div>
+    <div class="row">
+      <select id="trainType">
+        <option value="infantry">Infantry (Land)</option>
+        <option value="tank">Tank (Land)</option>
+        <option value="artillery">Artillery (Land)</option>
+        <option value="fighter">Fighter (Air)</option>
+        <option value="bomber">Bomber (Air)</option>
+        <option value="frigate">Frigate (Naval)</option>
+        <option value="battleship">Battleship (Naval)</option>
+        <option value="sub">Submarine (Naval)</option>
+      </select>
+      <button id="trainBtn">Train (in selected city)</button>
+      <button id="upgradeBtn">Upgrade City</button>
     </div>
 
     <div>
       <div class="small">Controls</div>
-      <div class="instructions">
-        - Click a ship to select. Click a tile to move. <br>
-        - Capture land by moving a ship onto it. Each capture yields resources. <br>
-        - Build Outpost on captured tile (cost 10). Outposts produce 3 resources / turn. <br>
-        - End turn to pass to AI. Try to outgrow rivals.
+      <div class="muted">
+        - Click units/cities to select.<br>
+        - Right-click a tile to move/attack.<br>
+        - Train units from a selected city (costs resources).<br>
+        - Cities produce resources each turn. Units consume Food each turn as upkeep.<br>
       </div>
     </div>
 
     <div>
       <div class="small">Game Log</div>
-      <div class="log" id="log"></div>
+      <div id="log" class="log"></div>
     </div>
 
-    <footer>
-      <div class="small">Publish: create a new GitHub repo and upload this single HTML file. Enable GitHub Pages on the repository's main branch.</div>
-    </footer>
+    <div class="small">Tip: fog of war hides tiles outside vision. Use units to scout.</div>
   </aside>
 </div>
 
 <script>
-// Archipelago — a compact single-file turn-based strategy game
-// Author: ChatGPT (for publishing on GitHub Pages)
-// Instructions: Save this file as archipelago.html and push to a public GitHub repo. Enable GitHub Pages.
+/*
+  Dominion Isles - Single file strategy prototype
+  - Map: 50x50 tiles
+  - Terrain: plains, forest, mountain, water
+  - Resources: gold, iron, wood, stone, food
+  - Units: many types (stats listed below)
+  - Cities: produce resources, can be upgraded and train units
+  - Turn-based loop: collect -> commands -> end turn
+  - A* pathfinding and simple AI
+*/
 
-(() => {
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  let W = canvas.width, H = canvas.height;
+/* ---------------------------
+   CONFIG / CONSTANTS
+   --------------------------- */
+const TILE_COUNT = 50;
+const TILE_SIZE = 12; // px
+const VISIBLE_SIZE = TILE_SIZE * TILE_COUNT;
+const FOG = true;
+const PLAYER_COL = '#6ee7b7'; // green
+const AI_COL = '#fb7185';     // pink
 
-  const TILE = 32; // tile size
-  const COLS = Math.floor(W / TILE);
-  const ROWS = Math.floor(H / TILE);
+// Terrain types and movement cost multipliers for unit categories
+const TERRAIN = {
+  plains: {color:'#2f8b57', move:1, resource:null},
+  forest: {color:'#1f6b3a', move:1.5, resource:'wood'},
+  mountain: {color:'#4b5563', move:3, resource:'iron'},
+  water: {color:'#04253b', move:1, resource:null}
+};
 
-  // Game state
-  let state = {
-    turn: 1,
-    phase: 'player',
-    resources: 20,
-    map: [],
-    units: [],
-    players: [],
-    log: []
+// Resources list
+const RESOURCES = ['gold','iron','wood','stone','food'];
+
+// Unit definitions
+const UNIT_TYPES = {
+  infantry:  {name:'Infantry',  cat:'land',  hp:10, atk:4, def:2, speed:2, range:1, cost:{gold:30,food:5}, upkeep:{food:1}},
+  tank:      {name:'Tank',      cat:'land',  hp:18, atk:8, def:5, speed:2, range:1, cost:{gold:80,iron:10,food:3}, upkeep:{food:2}},
+  artillery: {name:'Artillery', cat:'land',  hp:12, atk:10,def:1, speed:1, range:3, cost:{gold:70,iron:5,food:2}, upkeep:{food:2}},
+  fighter:   {name:'Fighter',   cat:'air',   hp:12, atk:7, def:3, speed:4, range:3, cost:{gold:150,iron:6,food:4}, upkeep:{food:3}},
+  bomber:    {name:'Bomber',    cat:'air',   hp:16, atk:12,def:1, speed:3, range:3, cost:{gold:200,iron:10,food:6}, upkeep:{food:4}},
+  frigate:   {name:'Frigate',   cat:'navy',  hp:16, atk:6, def:4, speed:3, range:2, cost:{gold:120,iron:8,food:3}, upkeep:{food:2}},
+  battleship:{name:'Battleship',cat:'navy',  hp:28, atk:12,def:8, speed:2, range:3, cost:{gold:300,iron:20,food:6}, upkeep:{food:5}},
+  sub:       {name:'Submarine', cat:'navy',  hp:14, atk:9, def:2, speed:3, range:1, cost:{gold:140,iron:8,food:3}, upkeep:{food:2}}
+};
+
+// City production base per level
+const CITY_BASE = {gold:5,iron:1,wood:1,stone:1,food:5}; // per level
+const CITY_UPGRADE_COST_MULT = 1.8;
+
+/* ---------------------------
+   GAME STATE
+   --------------------------- */
+let canvas = document.getElementById('mapCanvas');
+canvas.width = VISIBLE_SIZE;
+canvas.height = VISIBLE_SIZE;
+let ctx = canvas.getContext('2d');
+
+let state = {
+  turn: 1,
+  phase: 'player', // 'player' or 'ai'
+  map: [], // tiles[y][x]
+  units: [], // unit objects
+  cities: [], // city objects
+  players: [
+    {id:0,name:'Player',col:PLAYER_COL,resources:{gold:120,iron:10,wood:8,stone:6,food:40}},
+    {id:1,name:'Rival',col:AI_COL,resources:{gold:100,iron:6,wood:6,stone:4,food:30}}
+  ],
+  selected: null,
+  log: []
+};
+
+/* ---------------------------
+   UTILITIES
+   --------------------------- */
+const rand = n => Math.floor(Math.random()*n);
+const choice = arr => arr[rand(arr.length)];
+function pushLog(s){
+  state.log.unshift({t:Date.now(),s});
+  const el = document.getElementById('log');
+  el.innerHTML = state.log.slice(0,80).map(x=>`<div style="padding:4px">${x.s}</div>`).join('');
+}
+function inBounds(x,y){ return x>=0 && y>=0 && x<TILE_COUNT && y<TILE_COUNT; }
+
+/* ---------------------------
+   MAP GENERATION
+   --------------------------- */
+function generateMap(){
+  // Simple procedural generation: noise via multiple random seeds influencing values
+  const map = Array.from({length:TILE_COUNT},()=>Array.from({length:TILE_COUNT},()=>({terrain:'plains',resource:null, city:null, owner:null})));
+  const seeds = [];
+  const islandCount = 8 + rand(6);
+  for(let i=0;i<islandCount;i++){
+    seeds.push({x:rand(TILE_COUNT), y:rand(TILE_COUNT), r:6+rand(8), noise:rand(1000)});
+  }
+  for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++){
+    let v=0;
+    for(const s of seeds){
+      const dx=x-s.x, dy=y-s.y;
+      const d = Math.sqrt(dx*dx+dy*dy);
+      v += Math.max(0, (s.r + (Math.sin((dx+dy+s.noise)/5))*2) - d);
+    }
+    // coastline and water threshold
+    if(v < 3) map[y][x].terrain='water';
+    else {
+      // forest/mountain chance
+      const r = Math.random();
+      if(r < 0.12) map[y][x].terrain='forest';
+      else if(r < 0.18) map[y][x].terrain='mountain';
+      else map[y][x].terrain='plains';
+      // resource nodes on some tiles
+      if(map[y][x].terrain==='forest' && Math.random()<0.25) map[y][x].resource='wood';
+      if(map[y][x].terrain==='mountain' && Math.random()<0.25) map[y][x].resource='iron';
+      if(map[y][x].terrain==='plains' && Math.random()<0.06) map[y][x].resource='gold';
+      if(Math.random()<0.03 && map[y][x].terrain!=='water') map[y][x].resource='stone';
+    }
+  }
+  return map;
+}
+
+/* ---------------------------
+   SPAWN PLAYERS (ensure on land)
+   --------------------------- */
+function findSpawnArea(map){
+  // look for land tile with 8-connected land neighbors
+  for(let tries=0;tries<10000;tries++){
+    const x=rand(TILE_COUNT), y=rand(TILE_COUNT);
+    if(map[y][x].terrain==='water') continue;
+    // check not surrounded by water in 3x3
+    let ok=true;
+    for(let dy=-1;dy<=1 && ok;dy++) for(let dx=-1;dx<=1;dx++){
+      const nx=x+dx, ny=y+dy;
+      if(inBounds(nx,ny) && map[ny][nx].terrain==='water') ok=false;
+    }
+    if(ok) return {x,y};
+  }
+  // fallback
+  for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++) if(map[y][x].terrain!=='water') return {x,y};
+  return {x:0,y:0};
+}
+
+/* ---------------------------
+   INIT GAME
+   --------------------------- */
+function newGame(){
+  state.turn = 1; state.phase='player'; state.units=[]; state.cities=[]; state.log=[];
+  state.map = generateMap();
+  // Spawn two players on distinct land areas
+  const p0 = findSpawnArea(state.map);
+  const p1 = findSpawnArea(state.map);
+  // create cities
+  const city0 = createCity(p0.x,p0.y,0);
+  const city1 = createCity(p1.x,p1.y,1);
+  state.cities.push(city0,city1);
+  state.map[p0.y][p0.x].city = city0;
+  state.map[p1.y][p1.x].city = city1;
+  state.players[0].resources = {gold:120,iron:10,wood:8,stone:6,food:40};
+  state.players[1].resources = {gold:90,iron:6,wood:6,stone:4,food:30};
+  // initial scouting units
+  state.units.push(createUnit('infantry',0,p0.x+1,p0.y));
+  state.units.push(createUnit('frigate',1, p1.x+1,p1.y)); // AI naval
+  pushLog('New game started.');
+  redraw();
+  updateUI();
+}
+
+/* ---------------------------
+   CITY / UNIT CREATION
+   --------------------------- */
+let nextUnitId = 1, nextCityId = 1;
+function createCity(x,y,owner){
+  return {id: nextCityId++, x,y, owner, level:1, captureProgress:0, garrison:[], defendBonus:1};
+}
+function createUnit(type,owner,x,y){
+  const def = UNIT_TYPES[type];
+  return {
+    id: nextUnitId++,
+    type, owner, x,y,
+    hp: def.hp,
+    moves: def.speed,
+    maxMoves: def.speed,
+    atk:def.atk, def:def.def,
+    range:def.range, speed:def.speed,
+    cat:def.cat,
+    upkeep: def.upkeep,
+    status:'idle',
+    target:null
   };
+}
 
-  // Utility
-  const rand = (n) => Math.floor(Math.random()*n);
-  const randf = (a,b) => a + Math.random()*(b-a);
-
-  function pushLog(s){
-    state.log.unshift({t:Date.now(), s});
-    const el = document.getElementById('log');
-    el.innerHTML = state.log.slice(0,50).map(x=>`<div style="padding:4px">${x.s}</div>`).join('');
-  }
-
-  // Generate map: perlin-like islands using simple noise
-  function generateMap(){
-    const map = Array.from({length:ROWS},()=>Array.from({length:COLS},()=>({type:'water',resource:0,owner:null,fort:false}))); 
-    // Create seeds for islands
-    const seeds = [];
-    const islandCount = 6 + rand(4);
-    for(let i=0;i<islandCount;i++) seeds.push({x:rand(COLS), y:rand(ROWS), r:6+rand(6)});
-    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-      let v=0;
-      for(const s of seeds){
-        const dx = x-s.x, dy = y-s.y;
-        const d = Math.sqrt(dx*dx+dy*dy);
-        v += Math.max(0, (s.r+randf(-2,2)) - d);
-      }
-      if(v>5){
-        map[y][x].type='land';
-        if(Math.random()<0.04) map[y][x].resource = 5 + rand(8);
-      }
-    }
-    return map;
-  }
-
-  function newGame(){
-    state.turn = 1; state.phase='player'; state.resources=20; state.log=[];
-    state.map = generateMap();
-    state.players = [ {id:0,name:'You',color:'#86efac',ai:false}, {id:1,name:'Rival',color:'#fca5a5',ai:true} ];
-    state.units = [];
-    // Spawn player ships on random nearby water next to land
-    function placeFor(playerId){
-      for(let i=0;i<200;i++){
-        const x = rand(COLS), y = rand(ROWS);
-        if(state.map[y][x].type==='water'){
-          // require adjacent land to be interesting
-          const adjLand = neighbors(x,y).some(p=>state.map[p.y][p.x].type==='land');
-          if(adjLand){ state.units.push({id:Date.now()+Math.random(),x,y,owner:playerId,moves:3}); break; }
-        }
-      }
-    }
-    placeFor(0);
-    placeFor(1);
-    pushLog('New game started.');
-    renderHUD();
-  }
-
-  function neighbors(x,y){
-    const out=[];
-    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-      if(dx===0 && dy===0) continue;
-      const nx = x+dx, ny=y+dy;
-      if(nx>=0 && ny>=0 && nx<COLS && ny<ROWS) out.push({x:nx,y:ny});
-    }
-    return out;
-  }
-
-  function render(){
-    ctx.clearRect(0,0,W,H);
-    // draw tiles
-    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+/* ---------------------------
+   RENDER
+   --------------------------- */
+function redraw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // tiles
+  for(let y=0;y<TILE_COUNT;y++){
+    for(let x=0;x<TILE_COUNT;x++){
       const t = state.map[y][x];
-      const px = x*TILE, py = y*TILE;
-      if(t.type==='water'){
-        // slight wave effect
-        const shade = Math.floor(30 + 20*Math.sin((x+y + performance.now()/500)/6));
-        ctx.fillStyle = `rgb(0,${40+shade},${60+shade})`;
-        ctx.fillRect(px,py,TILE,TILE);
+      // color by terrain
+      ctx.fillStyle = TERRAIN[t.terrain].color;
+      ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      // resource icons
+      if(t.resource){
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(x*TILE_SIZE + TILE_SIZE/2 -3, y*TILE_SIZE + TILE_SIZE/2 -3, 6,6);
+      }
+      // city marker
+      if(t.city){
+        const c = t.city;
+        ctx.fillStyle = c.owner===0?PLAYER_COL:AI_COL;
+        ctx.fillRect(x*TILE_SIZE+2, y*TILE_SIZE+2, TILE_SIZE-4, TILE_SIZE-4);
+        // level marker
+        ctx.fillStyle = '#000';
+        ctx.fillText('L'+c.level, x*TILE_SIZE+4, y*TILE_SIZE+10);
+      }
+    }
+  }
+
+  // fog of war overlay
+  if(FOG){
+    // build visibility map for player 0
+    const visible = Array.from({length:TILE_COUNT},()=>Array(TILE_COUNT).fill(false));
+    const visRadius = 5;
+    for(const u of state.units.filter(u=>u.owner===0)){
+      for(let dy=-visRadius;dy<=visRadius;dy++) for(let dx=-visRadius;dx<=visRadius;dx++){
+        const nx=u.x+dx, ny=u.y+dy;
+        if(inBounds(nx,ny)) visible[ny][nx]=true;
+      }
+    }
+    for(const c of state.cities.filter(c=>c.owner===0)){
+      for(let dy=-visRadius;dy<=visRadius;dy++) for(let dx=-visRadius;dx<=visRadius;dx++){
+        const nx=c.x+dx, ny=c.y+dy;
+        if(inBounds(nx,ny)) visible[ny][nx]=true;
+      }
+    }
+    // overlay nonvisible
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++){
+      if(!visible[y][x]) ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE);
+    }
+  }
+
+  // units (draw after fog so units in fog give visibility)
+  for(const u of state.units){
+    const px=u.x*TILE_SIZE+TILE_SIZE/2, py=u.y*TILE_SIZE+TILE_SIZE/2;
+    ctx.beginPath();
+    ctx.arc(px,py, TILE_SIZE*0.4, 0, Math.PI*2);
+    ctx.fillStyle = state.players[u.owner].col;
+    ctx.fill();
+    ctx.fillStyle = '#071021';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font = '10px monospace';
+    ctx.fillText(u.type[0].toUpperCase(), px, py);
+    // hp bar
+    const w = TILE_SIZE*0.9, h=4;
+    const ratio = Math.max(0, u.hp / UNIT_TYPES[u.type].hp);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 8, w, h);
+    ctx.fillStyle = `linear-gradient(90deg, #fca5a5, #86efac)`; // not actually gradient but fine
+    ctx.fillStyle = '#86efac';
+    ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 8, w*ratio, h);
+    // selection highlight
+    if(state.selected && state.selected.type==='unit' && state.selected.id===u.id){
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
+      ctx.strokeRect(u.x*TILE_SIZE+1, u.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
+    }
+  }
+
+  // selected city highlight
+  if(state.selected && state.selected.type==='city'){
+    const c = state.selected.city;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
+    ctx.strokeRect(c.x*TILE_SIZE+1, c.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
+  }
+
+  // HUD top
+  document.getElementById('topHud').textContent = `Turn ${state.turn} — Phase: ${state.phase.toUpperCase()}`;
+}
+
+/* ---------------------------
+   UI / Interaction
+   --------------------------- */
+canvas.addEventListener('click', (ev)=>{
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((ev.clientX-rect.left)/ (rect.width / canvas.width) / TILE_SIZE);
+  const y = Math.floor((ev.clientY-rect.top)/ (rect.height / canvas.height) / TILE_SIZE);
+  handleLeftClick(x,y);
+});
+canvas.addEventListener('contextmenu', (ev)=>{ ev.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((ev.clientX-rect.left)/ (rect.width / canvas.width) / TILE_SIZE);
+  const y = Math.floor((ev.clientY-rect.top)/ (rect.height / canvas.height) / TILE_SIZE);
+  handleRightClick(x,y);
+});
+
+function handleLeftClick(x,y){
+  if(!inBounds(x,y)) return;
+  // select unit if owned
+  const unit = state.units.find(u=>u.x===x && u.y===y && u.owner===0);
+  if(unit){ state.selected = {type:'unit', id:unit.id, unit}; updateSelectedInfo(); redraw(); return; }
+  // select city if any
+  const city = state.cities.find(c=>c.x===x && c.y===y);
+  if(city){ state.selected = {type:'city', id:city.id, city}; updateSelectedInfo(); redraw(); return; }
+  // otherwise clear selection
+  state.selected = null; updateSelectedInfo(); redraw();
+}
+
+function handleRightClick(x,y){
+  if(state.phase !== 'player'){ pushLog('Not your turn.'); return; }
+  if(!state.selected){ pushLog('Select a unit or city first.'); return; }
+  if(state.selected.type==='unit'){
+    const unit = state.units.find(u=>u.id===state.selected.id);
+    if(!unit || unit.owner !== 0){ pushLog('Invalid unit.'); return; }
+    // find path using A*
+    const path = findPath(unit, {x,y});
+    if(!path){ pushLog('No path.'); return; }
+    // if final tile has enemy unit, perform attack immediately (simple)
+    const enemy = state.units.find(u=>u.x===x && u.y===y && u.owner!==unit.owner);
+    if(enemy && distance(unit.x,unit.y,x,y) <= unit.range){
+      // attack now
+      combat(unit, enemy);
+      redraw(); updateUI();
+      return;
+    }
+    // otherwise move along path up to unit.moves
+    const steps = Math.min(unit.moves, path.length-1);
+    const dest = path[steps];
+    unit.x = dest.x; unit.y = dest.y; unit.moves -= steps;
+    pushLog(`${UNIT_TYPES[unit.type].name} moved to (${unit.x},${unit.y})`);
+    // capture city if moved onto neutral/enemy city
+    const city = state.cities.find(c=>c.x===unit.x && c.y===unit.y && c.owner!==unit.owner);
+    if(city){
+      city.captureProgress = (city.captureProgress || 0) + 1;
+      pushLog(`Capturing city... (${city.captureProgress}/3)`);
+      if(city.captureProgress >= 3){ // held for 3 turns/moves
+        pushLog(`${state.players[unit.owner].name} captured a city!`);
+        city.owner = unit.owner; city.captureProgress=0;
+      }
+    }
+    redraw(); updateUI();
+  } else if(state.selected.type==='city'){
+    pushLog('Use a unit to move/attack.'); return;
+  }
+}
+
+/* ---------------------------
+   PATHFINDING (A*)
+   --------------------------- */
+function distance(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
+
+function findPath(unit, goal){
+  // A* on grid with terrain costs, respects unit category (navy can't go on land etc)
+  const start = {x:unit.x,y:unit.y};
+  const passable = (x,y)=>{
+    if(!inBounds(x,y)) return false;
+    const t = state.map[y][x].terrain;
+    if(unit.cat==='navy' && t!=='water') return false;
+    if(unit.cat!=='navy' && t==='water') return false;
+    return true;
+  };
+  // simple 4-directional
+  const open = new Map();
+  const closed = new Set();
+  function key(p){ return `${p.x},${p.y}`; }
+  open.set(key(start), {x:start.x,y:start.y,g:0,h:distance(start.x,start.y,goal.x,goal.y),f:distance(start.x,start.y,goal.x,goal.y),parent:null});
+  const maxIter = 10000;
+  let iter=0;
+  while(open.size>0 && iter<maxIter){
+    iter++;
+    // take lowest f
+    let curKey; let cur;
+    for(const [k,v] of open) { if(!cur || v.f < cur.f) { cur = v; curKey = k; } }
+    open.delete(curKey); closed.add(curKey);
+    if(cur.x===goal.x && cur.y===goal.y) {
+      // reconstruct path
+      const path = [];
+      let p = cur;
+      while(p){ path.unshift({x:p.x,y:p.y}); p = p.parent; }
+      return path;
+    }
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for(const d of dirs){
+      const nx=cur.x+d[0], ny=cur.y+d[1];
+      const nk = key({x:nx,y:ny});
+      if(!inBounds(nx,ny) || closed.has(nk) || !passable(nx,ny)) continue;
+      // movement cost: base 1 * terrain multiplier
+      const terr = state.map[ny][nx].terrain;
+      const cost = TERRAIN[terr].move;
+      const g = cur.g + cost;
+      const h = distance(nx,ny,goal.x,goal.y);
+      const f = g + h;
+      if(open.has(nk)){
+        const existing = open.get(nk);
+        if(g < existing.g) open.set(nk, {x:nx,y:ny,g,h,f,parent:cur});
       } else {
-        ctx.fillStyle = '#2d6b3a';
-        ctx.fillRect(px,py,TILE,TILE);
-        // resource
-        if(t.resource>0){ ctx.fillStyle = '#fef08a'; ctx.fillRect(px+TILE*0.5-6, py+TILE*0.5-6, 12,12);} 
-        if(t.fort){ ctx.fillStyle = '#403b3b'; ctx.fillRect(px+6,py+6, TILE-12, TILE-12); }
-      }
-      // grid lines
-      ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.strokeRect(px,py,TILE,TILE);
-    }
-    // draw units
-    for(const u of state.units){
-      const px = u.x*TILE + TILE/2, py = u.y*TILE + TILE/2;
-      ctx.beginPath(); ctx.arc(px,py,10,0,Math.PI*2); ctx.fillStyle = u.owner===0? '#7dd3fc' : '#fb7185'; ctx.fill();
-      ctx.fillStyle = '#022'; ctx.font = '12px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('⛵', px, py+1);
-    }
-    // draw selection
-    if(sel){ ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2; ctx.strokeRect(sel.x*TILE+2, sel.y*TILE+2, TILE-4, TILE-4); }
-  }
-
-  function renderHUD(){
-    document.getElementById('turn').textContent = `Turn ${state.turn}`;
-    document.getElementById('phase').textContent = state.phase === 'player' ? 'Player' : 'AI';
-    document.getElementById('res').textContent = state.resources;
-  }
-
-  // Selection & interaction
-  let sel = null;
-  canvas.addEventListener('click', (ev)=>{
-    const rect = canvas.getBoundingClientRect();
-    const mx = Math.floor((ev.clientX-rect.left)/ (rect.width / canvas.width));
-    const my = Math.floor((ev.clientY-rect.top)/ (rect.height / canvas.height));
-    const tx = Math.floor(mx / TILE), ty = Math.floor(my / TILE);
-    clickTile(tx,ty);
-  });
-
-  function clickTile(tx,ty){
-    const clickedUnit = state.units.find(u=>u.x===tx && u.y===ty && u.owner===0);
-    if(clickedUnit){ sel = clickedUnit; pushLog('Selected ship.'); render(); return; }
-    if(sel){
-      const dist = Math.abs(sel.x-tx)+Math.abs(sel.y-ty);
-      if(dist<=sel.moves){
-        // move
-        sel.x = tx; sel.y = ty; sel.moves -= Math.max(1,dist);
-        pushLog(`Ship moved to ${tx},${ty}`);
-        // capture land
-        if(state.map[ty][tx].type==='land' && state.map[ty][tx].owner!==0){
-          if(state.map[ty][tx].owner===1) pushLog('You wrested control from the Rival!');
-          else pushLog('You captured land.');
-          state.map[ty][tx].owner = 0;
-          // collect resources when capturing
-          const gain = 3 + rand(3);
-          state.resources += gain;
-          pushLog(`+${gain} resources collected.`);
-        }
-        renderHUD(); render();
-      } else pushLog('Too far. Move closer.');
-    }
-  }
-
-  // Turn progression
-  document.getElementById('newBtn').onclick = ()=> newGame();
-  document.getElementById('saveBtn').onclick = ()=>{
-    localStorage.setItem('archipelago.save', JSON.stringify(state)); pushLog('Game saved to localStorage.');
-  };
-  document.getElementById('loadBtn').onclick = ()=>{
-    const s = localStorage.getItem('archipelago.save');
-    if(!s){ pushLog('No save found.'); return; }
-    state = JSON.parse(s); pushLog('Game loaded.'); renderHUD(); render();
-  };
-  document.getElementById('exportBtn').onclick = ()=>{
-    const blob = new Blob([JSON.stringify({map:state.map, units:state.units},null,2)],{type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download='archipelago-map.json'; a.click(); URL.revokeObjectURL(url);
-  };
-
-  function endTurn(){
-    // reset moves, produce resources from forts
-    for(const u of state.units) u.moves = 3;
-    // forts produce
-    let inc = 0;
-    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-      const t = state.map[y][x]; if(t.fort && t.owner===0){ inc+=3; }
-    }
-    state.resources += inc;
-    if(inc>0) pushLog(`Your outposts produced ${inc} resources.`);
-
-    // AI phase
-    state.phase = 'ai'; renderHUD();
-    setTimeout(()=>{ aiTurn(); }, 400);
-  }
-
-  function aiTurn(){
-    pushLog('Rival is thinking...');
-    // Simple AI: move towards nearest neutral land and capture, or spawn new ship if resources
-    const rivalUnits = state.units.filter(u=>u.owner===1);
-    for(const u of rivalUnits){
-      // find nearest land tile not owned by rival
-      let best = null, bestd=9999;
-      for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-        if(state.map[y][x].type==='land' && state.map[y][x].owner!==1){
-          const d = Math.abs(u.x-x)+Math.abs(u.y-y);
-          if(d<bestd){ bestd=d; best={x,y}; }
-        }
-      }
-      if(best){
-        // step towards
-        const dx = Math.sign(best.x - u.x), dy = Math.sign(best.y - u.y);
-        u.x += dx; u.y += dy;
-        // capture
-        if(state.map[u.y][u.x].type==='land' && state.map[u.y][u.x].owner!==1){
-          state.map[u.y][u.x].owner = 1; pushLog('Rival captured land.');
-        }
-      } else {
-        // wander
-        u.x = Math.max(0, Math.min(COLS-1, u.x + (rand(3)-1)));
-        u.y = Math.max(0, Math.min(ROWS-1, u.y + (rand(3)-1)));
+        open.set(nk, {x:nx,y:ny,g,h,f,parent:cur});
       }
     }
-    // rival builds fort sometimes
-    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-      const t = state.map[y][x]; if(t.type==='land' && t.owner===1 && !t.fort && Math.random()<0.02){ t.fort=true; }
+  }
+  return null;
+}
+
+/* ---------------------------
+   COMBAT
+   --------------------------- */
+function combat(attacker, defender){
+  const atk = UNIT_TYPES[attacker.type].atk;
+  const def = UNIT_TYPES[defender.type].def;
+  // simple damage calc
+  const hit = Math.max(1, atk - defender.def);
+  defender.hp -= hit;
+  pushLog(`${UNIT_TYPES[attacker.type].name} hit ${UNIT_TYPES[defender.type].name} for ${hit} damage`);
+  if(defender.hp <= 0){
+    pushLog(`${UNIT_TYPES[defender.type].name} destroyed`);
+    // remove defender
+    state.units = state.units.filter(u=>u.id!==defender.id);
+  } else {
+    // counterattack if in range
+    if(distance(attacker.x,attacker.y,defender.x,defender.y) <= defender.range){
+      const ch = Math.max(1, defender.atk - attacker.def);
+      attacker.hp -= ch;
+      pushLog(`${UNIT_TYPES[defender.type].name} countered for ${ch}`);
+      if(attacker.hp <= 0){ pushLog(`${UNIT_TYPES[attacker.type].name} destroyed`); state.units = state.units.filter(u=>u.id!==attacker.id); }
     }
-    // rival occasionally spawns new unit if plenty of neutral land
-    if(Math.random()<0.3){
-      // find water adjacent to rival land
-      for(let i=0;i<300;i++){
-        const x = rand(COLS), y=rand(ROWS);
-        if(state.map[y][x].type==='water'){
-          const adj = neighbors(x,y); if(adj.some(p=>state.map[p.y][p.x].owner===1)){ state.units.push({id:Date.now()+Math.random(),x,y,owner:1,moves:3}); break; }
+  }
+}
+
+/* ---------------------------
+   UPKEEP & RESOURCE COLLECTION
+   --------------------------- */
+function collectResources(){
+  // collect from cities
+  for(const city of state.cities){
+    if(city.owner===null) continue;
+    const p = state.players[city.owner];
+    for(const r of RESOURCES){
+      const amt = Math.floor((CITY_BASE[r]||0) * city.level);
+      if(!p.resources[r]) p.resources[r]=0;
+      p.resources[r] += amt;
+    }
+    // nearby resource nodes add small bonus
+    const radius=2;
+    for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++){
+      const nx=city.x+dx, ny=city.y+dy;
+      if(inBounds(nx,ny) && state.map[ny][nx].resource){
+        const res = state.map[ny][nx].resource;
+        if(!p.resources[res]) p.resources[res]=0;
+        p.resources[res] += 1 * city.level;
+      }
+    }
+  }
+  // upkeep - subtract food from all units per owner
+  const upKeepByOwner = {};
+  for(const u of state.units){
+    const uf = u.upkeep || {food:0};
+    if(uf.food){
+      upKeepByOwner[u.owner] = (upKeepByOwner[u.owner]||0) + uf.food;
+    }
+  }
+  for(const pid of [0,1]){
+    if(upKeepByOwner[pid]){
+      state.players[pid].resources.food -= upKeepByOwner[pid];
+      pushLog(`${state.players[pid].name} paid ${upKeepByOwner[pid]} food upkeep`);
+      // if food negative, start attrition
+      if(state.players[pid].resources.food < 0){
+        state.players[pid].resources.food = 0;
+        // damage units
+        state.units.filter(u=>u.owner===pid).forEach(u=>{ u.hp -= 2; if(u.hp<=0) pushLog(`${UNIT_TYPES[u.type].name} starved and died`); });
+        state.units = state.units.filter(u=>u.hp>0);
+      }
+    }
+  }
+}
+
+/* ---------------------------
+   END TURN / AI
+   --------------------------- */
+function endTurn(){
+  if(state.phase !== 'player') return;
+  // reset moves
+  state.units.forEach(u => u.moves = u.maxMoves);
+  collectResources();
+  state.turn++;
+  state.phase = 'ai';
+  pushLog('Turn ended. Rival thinking...');
+  updateUI();
+  // run AI after small delay
+  setTimeout(()=>{ aiTurn(); }, 400);
+}
+
+function aiTurn(){
+  // simple AI: collect/buy units if has resources; move units toward nearest enemy or neutral city; attack if adjacent
+  // Collect already done at endTurn
+  const ai = state.players[1];
+  // Try to train a unit at their cities if resources allow
+  for(const city of state.cities.filter(c=>c.owner===1)){
+    // If AI lacks units, attempt to build infantry or navy depending on nearby terrain
+    const nearWater = checkNearbyWater(city.x,city.y,3);
+    const tryType = nearWater ? 'frigate' : 'infantry';
+    if(canAfford(1, tryType)){
+      spendCost(1, tryType);
+      const newU = createUnit(tryType,1, city.x+1, city.y);
+      state.units.push(newU);
+      pushLog('Rival trained a ' + UNIT_TYPES[tryType].name);
+    }
+  }
+  // Move each AI unit toward nearest enemy city or player unit
+  for(const u of state.units.filter(u=>u.owner===1)){
+    // find target: enemy city first, else player unit
+    let target = null;
+    let bestd=9999;
+    for(const city of state.cities.filter(c=>c.owner!==1)){
+      const d = distance(u.x,u.y,city.x,city.y);
+      if(d<bestd){ bestd=d; target={x:city.x,y:city.y}; }
+    }
+    if(!target){
+      for(const pu of state.units.filter(pu=>pu.owner===0)){
+        const d = distance(u.x,u.y,pu.x,pu.y);
+        if(d<bestd){ bestd=d; target={x:pu.x,y:pu.y}; }
+      }
+    }
+    if(target){
+      const path = findPath(u, target);
+      if(path && path.length>1){
+        const steps = Math.min(u.moves, path.length-1);
+        const dest = path[steps];
+        u.x = dest.x; u.y = dest.y; u.moves -= steps;
+        // if moved onto enemy unit -> attack
+        const enemy = state.units.find(z=>z.x===u.x && z.y===u.y && z.owner===0);
+        if(enemy && distance(u.x,u.y,enemy.x,enemy.y) <= u.range) combat(u,enemy);
+        // if moved onto city -> capture progress
+        const city = state.cities.find(c=>c.x===u.x && c.y===u.y && c.owner!==1);
+        if(city){
+          city.captureProgress = (city.captureProgress||0) + 1;
+          if(city.captureProgress >= 3){ city.owner = 1; city.captureProgress=0; pushLog('Rival captured a city!'); }
         }
       }
     }
-    // AI end
-    state.phase='player'; state.turn+=1; renderHUD(); pushLog('Your turn.'); render();
   }
 
-  // Building outposts
-  canvas.addEventListener('contextmenu', (e)=>{ e.preventDefault(); const rect = canvas.getBoundingClientRect(); const mx = Math.floor((e.clientX-rect.left)/(rect.width/canvas.width)); const my = Math.floor((e.clientY-rect.top)/(rect.height/canvas.height)); const tx=Math.floor(mx/TILE), ty=Math.floor(my/TILE); buildOutpost(tx,ty); });
-  function buildOutpost(tx,ty){
-    const t = state.map[ty][tx];
-    if(t.type!=='land' || t.owner!==0) { pushLog('You must own land to build.'); return; }
-    if(t.fort){ pushLog('There is already an outpost.'); return; }
-    if(state.resources<10){ pushLog('Not enough resources to build (10).'); return; }
-    state.resources -= 10; t.fort=true; pushLog('Outpost built. Produces 3 resources/turn.'); renderHUD(); render();
+  // reset moves for AI (for simplicity)
+  state.units.forEach(u => u.moves = u.maxMoves);
+
+  // check defeat
+  checkDefeat();
+
+  // back to player
+  state.phase = 'player';
+  pushLog('Your turn.');
+  updateUI();
+  redraw();
+}
+
+/* ---------------------------
+   AI helpers
+   --------------------------- */
+function checkNearbyWater(x,y,r){
+  for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+    const nx=x+dx, ny=y+dy;
+    if(inBounds(nx,ny) && state.map[ny][nx].terrain==='water') return true;
   }
+  return false;
+}
 
-  // Game loop
-  function resize(){
-    W = canvas.width = canvas.clientWidth * devicePixelRatio; H = canvas.height = canvas.clientHeight * devicePixelRatio;
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+/* ---------------------------
+   TRAIN / UPGRADE / AFFORD
+   --------------------------- */
+function canAfford(playerId, type){
+  const cost = UNIT_TYPES[type].cost;
+  const p = state.players[playerId];
+  for(const k in cost) if((p.resources[k]||0) < cost[k]) return false;
+  return true;
+}
+function spendCost(playerId, type){
+  const cost = UNIT_TYPES[type].cost;
+  const p = state.players[playerId];
+  for(const k in cost) p.resources[k] = (p.resources[k]||0) - cost[k];
+}
+
+/* ---------------------------
+   UI Buttons
+   --------------------------- */
+document.getElementById('newBtn').onclick = ()=> newGame();
+document.getElementById('endBtn').onclick = ()=> endTurn();
+document.getElementById('nextAI').onclick = ()=> { if(state.phase==='player'){ endTurn(); } };
+
+document.getElementById('trainBtn').onclick = ()=>{
+  if(!state.selected || state.selected.type!=='city'){ pushLog('Select one of your cities to train units.'); return; }
+  const city = state.selected.city;
+  if(city.owner !== 0){ pushLog('You do not own that city.'); return; }
+  const type = document.getElementById('trainType').value;
+  if(!canAfford(0,type)){ pushLog('Not enough resources.'); return; }
+  spendCost(0,type);
+  const spawnX = Math.min(TILE_COUNT-1, city.x+1);
+  const spawnY = city.y;
+  const u = createUnit(type,0,spawnX,spawnY);
+  state.units.push(u);
+  pushLog(`Trained ${UNIT_TYPES[type].name} at city.`);
+  updateUI(); redraw();
+};
+
+document.getElementById('upgradeBtn').onclick = ()=>{
+  if(!state.selected || state.selected.type!=='city'){ pushLog('Select one of your cities to upgrade.'); return; }
+  const city = state.selected.city;
+  if(city.owner !== 0){ pushLog('You do not own that city.'); return; }
+  // cost scales with level
+  const costMult = Math.floor(30 * Math.pow(CITY_UPGRADE_COST_MULT, city.level));
+  if((state.players[0].resources.gold||0) < costMult){ pushLog('Not enough gold to upgrade.'); return; }
+  state.players[0].resources.gold -= costMult;
+  city.level++;
+  pushLog(`City upgraded to level ${city.level}`);
+  updateUI(); redraw();
+};
+
+/* ---------------------------
+   SELECTED INFO & UI update
+   --------------------------- */
+function updateSelectedInfo(){
+  const el = document.getElementById('selectedInfo');
+  if(!state.selected){ el.textContent = 'None'; return; }
+  if(state.selected.type==='unit'){
+    const u = state.units.find(x=>x.id===state.selected.id);
+    if(!u){ el.textContent = 'None'; return; }
+    el.innerHTML = `${UNIT_TYPES[u.type].name} • HP ${u.hp}/${UNIT_TYPES[u.type].hp} • Moves ${u.moves}/${u.maxMoves} • Owner: ${state.players[u.owner].name}`;
+  } else {
+    const c = state.selected.city;
+    el.innerHTML = `City L${c.level} • Owner: ${state.players[c.owner].name} • Capture: ${c.captureProgress||0}/3`;
   }
-  window.addEventListener('resize', resize);
-  resize();
+}
 
-  // simple animation loop
-  function loop(){ render(); requestAnimationFrame(loop); }
-  loop();
+function updateResourcePanel(){
+  const p = state.players[0];
+  const panel = document.getElementById('resourcePanel');
+  panel.innerHTML = RESOURCES.map(r=>`<div class="res">${r.toUpperCase()}: ${p.resources[r]||0}</div>`).join('');
+}
 
-  // start
-  newGame();
+function updateUI(){
+  updateResourcePanel();
+  updateSelectedInfo();
+  redraw();
+}
 
-  // keyboard shortcuts
-  window.addEventListener('keydown', (e)=>{
-    if(e.key==='Enter') endTurn();
-    if(e.key==='s' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); localStorage.setItem('archipelago.save', JSON.stringify(state)); pushLog('Game saved (shortcut).'); }
-  });
+/* ---------------------------
+   GAME END CHECK
+   --------------------------- */
+function checkDefeat(){
+  // if a player has no cities or no units, they lose
+  for(const pid of [0,1]){
+    const cities = state.cities.filter(c=>c.owner===pid);
+    const units = state.units.filter(u=>u.owner===pid);
+    if(cities.length===0 || units.length===0){
+      pushLog(`${state.players[1-pid].name} wins!`);
+      // freeze game
+      state.phase = 'end';
+      alert(`${state.players[1-pid].name} wins!`);
+    }
+  }
+}
 
-})();
+/* ---------------------------
+   INITIALIZE
+   --------------------------- */
+newGame();
+updateUI();
+redraw();
+
+/* ---------------------------
+   OPTIONAL: save/load (localStorage)
+   --------------------------- */
+window.addEventListener('keydown', (e)=>{
+  if(e.key === 's' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); localStorage.setItem('dominion_save', JSON.stringify(state)); pushLog('Saved game.'); }
+  if(e.key === 'l' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); const s=localStorage.getItem('dominion_save'); if(s){ state = JSON.parse(s); pushLog('Loaded save.'); updateUI(); } else pushLog('No save found'); }
+});
+
 </script>
 </body>
 </html>
