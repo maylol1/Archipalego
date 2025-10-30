@@ -124,583 +124,271 @@
 </div>
 
 <script>
-/*
-  UNO Deluxe — Fixed & Polished
-  Key fixes:
-  - AI turn flow: AI acts once per turn, waits 1–1.5s, won't "dump" hand.
-  - Drawing: player hand layout is stable (flex), draw action re-renders full hand to avoid shift.
-  - Draw end-turn: if drawn card not playable, turn automatically passes to next player.
-  - Wild handling: color is finalized before AI chooses.
-  - Animations: polished slide-to-discard and draw feedback.
-  - Single-file, WebAudio-based sound, select AI count before start.
-*/
+/* ============================================================
+   UNO GAME SCRIPT – Refactored + Fixed + Smarter AI
+   ============================================================ */
 
-/* ========= Audio (WebAudio) ========= */
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-let audioCtx = null;
-function ensureAudio(){
-  if(!audioCtx){ audioCtx = new AudioCtx(); if(audioCtx.state === 'suspended'){ const resume = ()=>audioCtx.resume(); window.addEventListener('click', resume, {once:true}); } }
-}
-function playSeq(seq){
-  if(!audioCtx) return;
-  const now = audioCtx.currentTime;
-  let t = now;
-  for(const s of seq){
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = s.type || 'sine';
-    o.frequency.setValueAtTime(s.freq, t);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime((s.vol||0.06), t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + s.dur - 0.02);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(t); o.stop(t + s.dur);
-    t += s.dur;
+let deck = [];
+let players = [];
+let current = 0;
+let direction = 1;
+let topCard = null;
+let topColor = null;
+let busy = false;
+let waitingColor = null;
+
+/* --- Utility helpers --- */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const log = (msg) => console.log(`[UNO] ${msg}`);
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
   }
-}
-function sfxShuffle(){ ensureAudio(); playSeq([{freq:1400,dur:0.06,type:'sawtooth',vol:0.05},{freq:900,dur:0.08,type:'sawtooth',vol:0.05},{freq:700,dur:0.09,type:'sine',vol:0.04}]); }
-function sfxPlay(){ ensureAudio(); playSeq([{freq:880,dur:0.09,type:'triangle',vol:0.07},{freq:1320,dur:0.06,type:'sine',vol:0.05}]); }
-function sfxDraw(){ ensureAudio(); playSeq([{freq:540,dur:0.08,type:'sine',vol:0.06},{freq:700,dur:0.06,type:'sine',vol:0.045}]); }
-function sfxSkip(){ ensureAudio(); playSeq([{freq:420,dur:0.08,type:'square',vol:0.06},{freq:300,dur:0.05,type:'square',vol:0.045}]); }
-function sfxReverse(){ ensureAudio(); playSeq([{freq:720,dur:0.09,type:'triangle',vol:0.07},{freq:880,dur:0.08,type:'triangle',vol:0.055}]); }
-function sfxUno(){ ensureAudio(); playSeq([{freq:1000,dur:0.18,type:'sine',vol:0.09},{freq:1200,dur:0.12,type:'sine',vol:0.07}]); }
-function sfxWin(){ ensureAudio(); playSeq([{freq:880,dur:0.12,type:'triangle',vol:0.09},{freq:1100,dur:0.10,type:'triangle',vol:0.08},{freq:1320,dur:0.14,type:'sawtooth',vol:0.1}]); }
-
-/* ========= Deck & Card helpers ========= */
-const COLORS = ['red','yellow','green','blue'];
-function createDeck(){
-  const deck = [];
-  for(const c of COLORS){
-    deck.push({color:c, value:'0'});
-    for(let n=1;n<=9;n++){ deck.push({color:c,value:String(n)}); deck.push({color:c,value:String(n)}); }
-    for(let i=0;i<2;i++){ deck.push({color:c,value:'skip'}); deck.push({color:c,value:'reverse'}); deck.push({color:c,value:'draw2'}); }
-  }
-  for(let i=0;i<4;i++) deck.push({color:'wild', value:'wild'});
-  for(let i=0;i<4;i++) deck.push({color:'wild', value:'wild4'});
-  return deck;
-}
-function shuffle(arr){
-  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
-  sfxShuffle();
-  return arr;
+  return array;
 }
 
-/* ========= Game state ========= */
-let deck = [], discard = [];
-let players = []; // {name, hand:[], isAI, unoCalled:false}
-let current = 0, direction = 1;
-let topColor = null, topValue = null;
-let waitingColor = null; // {playerIndex, playedCard}
-let aiCount = 2;
-let busy = false; // lock UI during animations
-
-/* ========= DOM refs ========= */
-const board = document.getElementById('board');
-const drawBack = document.getElementById('drawBack');
-const discardTop = document.getElementById('discardTop');
-const playersTopEl = document.getElementById('playersTop');
-const handContainer = document.getElementById('handContainer');
-const logEl = document.getElementById('log');
-const statusEl = document.getElementById('status');
-const turnBadge = document.getElementById('turnBadge');
-const startBtn = document.getElementById('startBtn');
-const newBtn = document.getElementById('newBtn');
-const drawBtn = document.getElementById('drawBtn');
-const unoBtn = document.getElementById('unoBtn');
-const aiCountSelect = document.getElementById('aiCountSelect');
-const playersCountLabel = document.getElementById('playersCountLabel');
-const colorPicker = document.getElementById('colorPicker');
-const colorBtns = document.querySelectorAll('.colorPickBtn');
-const playedArea = document.getElementById('playedArea');
-const victoryOverlay = document.getElementById('victoryOverlay');
-
-/* ========= Utility functions ========= */
-function log(msg){ const d=document.createElement('div'); d.textContent=msg; logEl.prepend(d); }
-function setStatus(s){ statusEl.textContent=s; }
-function setTurnBadge(){ turnBadge.textContent = `Turn: ${players[current].name}`; }
-function cardSymbol(c){
-  if(!c) return '';
-  if(c.color === 'wild') return c.value === 'wild4' ? '+4' : '★';
-  if(c.value==='skip') return '⏭';
-  if(c.value==='reverse') return '⤾';
-  if(c.value==='draw2') return '+2';
-  return c.value;
-}
-function cardClass(c){
-  if(!c) return '';
-  if(c.color==='wild') return 'face-wild';
-  return c.color==='red' ? 'face-red' : c.color==='yellow' ? 'face-yellow' : c.color==='green' ? 'face-green' : 'face-blue';
-}
-
-/* ========= Rendering ========= */
-function renderDiscardTop(){
-  const top = discard[discard.length-1];
-  if(!top){ discardTop.innerHTML=''; topColor = topValue = null; return; }
-  const displayColor = (top.color === 'wild' && top.chosenColor) ? top.chosenColor : top.color;
-  const temp = {...top, color: displayColor};
-  discardTop.innerHTML = `<div style="width:100%;height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center" class="${cardClass(temp)}"><div style="font-size:30px">${cardSymbol(temp)}</div></div>`;
-  topColor = displayColor; topValue = top.value;
-}
-function renderPiles(){
-  drawBack.textContent = deck.length;
-  renderDiscardTop();
-}
-
-/* stable hand layout using flex: re-render whole hand after any change */
-function renderPlayerHand(){
-  handContainer.innerHTML = '';
-  const hand = players[0].hand;
-  for(let i=0;i<hand.length;i++){
-    const c = hand[i];
-    const el = document.createElement('div');
-    el.className = 'handCard ' + cardClass(c);
-    el.innerHTML = `<div class="cardSymbol">${cardSymbol(c)}</div><div class="cardSub">${c.color==='wild' ? (c.value==='wild4'?'+4':'WILD') : ''}</div>`;
-    el.style.pointerEvents = (current === 0 && !busy) ? 'auto' : 'none';
-    // show playable visual
-    if(canPlayCard(c, 0)) { el.style.boxShadow = '0 28px 56px rgba(3,7,12,0.6), 0 0 0 6px rgba(125,211,252,0.06)'; el.style.transform='translateY(-6px)'; }
-    el.addEventListener('click', ()=> {
-      if(busy) return;
-      if(current !== 0) { setStatus('Not your turn'); return; }
-      if(!canPlayCard(c, 0)){ setStatus('Cannot play this card'); return; }
-      const idx = players[0].hand.indexOf(c);
-      playerPlay(idx);
-    });
-    handContainer.appendChild(el);
-  }
-}
-
-/* AI slots render */
-function renderAITop(){
-  playersTopEl.innerHTML = '';
-  for(let i=1;i<players.length;i++){
-    const p = players[i];
-    const slot = document.createElement('div');
-    slot.className = 'aiSlot';
-    const row = document.createElement('div'); row.className='aiCards';
-    const show = Math.min(8, p.hand.length);
-    for(let k=0;k<show;k++){ const card=document.createElement('div'); card.className='aiCard'; row.appendChild(card); }
-    const label = document.createElement('div'); label.className='mini'; label.textContent = `${p.name} (${p.hand.length})`;
-    slot.appendChild(row); slot.appendChild(label);
-    playersTopEl.appendChild(slot);
-  }
-}
-
-/* render everything */
-function renderAll(){
-  renderAITop(); renderPlayerHand(); renderPiles(); setTurnBadge();
-}
-
-/* ========= Deck management ========= */
-function reshuffleIfNeeded(){
-  if(deck.length === 0){
-    if(discard.length <= 1) return;
-    const top = discard.pop();
-    deck = shuffle(discard.splice(0, discard.length));
-    discard = [top];
-    log('Reshuffled discard into deck');
-  }
-}
-
-/* ========= Game start / restart ========= */
-function startGame(){
-  ensureAudio();
-  aiCount = parseInt(aiCountSelect.value,10);
-  players = [];
-  players.push({name:'You', hand:[], isAI:false, unoCalled:false});
-  for(let i=1;i<=aiCount;i++) players.push({name:`AI ${i}`, hand:[], isAI:true, unoCalled:false});
-  playersCountLabel.innerText = `Human + ${aiCount} AI`;
-  deck = shuffle(createDeck());
-  discard = [];
-  for(let r=0;r<7;r++){ for(let p=0;p<players.length;p++){ players[p].hand.push(deck.pop()); } }
-  let starter = deck.pop();
-  while(starter.value==='wild' || starter.value==='wild4'){ deck.unshift(starter); shuffle(deck); starter = deck.pop(); }
-  discard.push(starter);
-  topColor = (starter.color==='wild' && starter.chosenColor) ? starter.chosenColor : starter.color;
-  topValue = starter.value;
-  current = 0; direction = 1; waitingColor = null; busy = false;
-  renderAll();
-  setStatus('Game started');
-  log('Game started. Top: ' + cardText(starter));
-  // apply initial card special
-  if(starter.value === 'skip'){ log('Initial card Skip — first player skipped'); current = getNext(current); }
-  else if(starter.value === 'reverse'){ log('Initial card Reverse — direction changed'); direction *= -1; }
-  else if(starter.value === 'draw2'){ const nxt = getNext(current); drawCards(nxt,2); log(`${players[nxt].name} draws 2`); current = getNext(nxt); }
-  renderAll(); updateTurn();
-}
-
-function cardText(c){ if(!c) return ''; if(c.value==='skip') return `${c.color} SKIP`; if(c.value==='reverse') return `${c.color} REVERSE`; if(c.value==='draw2') return `${c.color} +2`; if(c.value==='wild') return 'WILD'; if(c.value==='wild4') return 'WILD +4'; return `${c.color} ${c.value}`; }
-
-/* ========= Turn helpers ========= */
-function getNext(i){ return (i + direction + players.length) % players.length; }
-function updateTurn(){
-  renderAll();
-  // if someone played wild and waiting for color, do not auto-run AI
-  if(waitingColor) return;
-  if(players[current].isAI){
-    setTimeout(() => aiTurn(), 1000 + Math.random()*500); // realistic delay
-  } else {
-    // enable player input
-    setStatus('Your turn');
-  }
-}
-
-/* ========= Play validation ========= */
-function canPlayCard(card, playerIndex){
-  if(!card) return false;
-  if(card.color === 'wild'){
-    if(card.value === 'wild4'){
-      // illegal if player has color match
-      const hand = players[playerIndex].hand;
-      const hasColorMatch = hand.some(h => h.color === topColor && h.color !== 'wild');
-      if(hasColorMatch) return false;
-      return true;
+/* --- Deck management --- */
+function buildDeck() {
+  const colors = ["red", "yellow", "green", "blue"];
+  const values = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "draw2"];
+  deck = [];
+  for (const c of colors) {
+    for (const v of values) {
+      deck.push({ color: c, value: v });
+      if (v !== "0") deck.push({ color: c, value: v });
     }
-    return true;
   }
-  if(topColor === null) return true;
-  if(card.color === topColor) return true;
-  if(card.value === topValue) return true;
-  return false;
+  for (let i = 0; i < 4; i++) {
+    deck.push({ color: "wild", value: "wild" });
+    deck.push({ color: "wild", value: "wild4" });
+  }
+  shuffle(deck);
 }
 
-/* ========= Player actions ========= */
-function playerPlay(cardIndex){
-  if(busy) return;
-  if(current !== 0) { setStatus('Not your turn'); return; }
-  if(cardIndex < 0 || cardIndex >= players[0].hand.length) return;
-  const card = players[0].hand[cardIndex];
-  if(!canPlayCard(card,0)){ setStatus('Cannot play that card'); return; }
-  // penalty check for forgotten UNO
-  checkUnoPenalty(0);
-  // remove and push to discard
-  const [played] = players[0].hand.splice(cardIndex,1);
-  discard.push(played);
-  renderAll();
-  animatePlay(played,0);
-  sfxPlay();
-  log(`You played ${cardText(played)}`);
-  if(played.color === 'wild'){
-    waitingColor = {playerIndex:0, played:played};
-    showColorPicker();
-  } else {
-    topColor = played.color; topValue = played.value;
-    setTimeout(()=> applyEffect(0, played), 420);
-  }
-  // check UNO auto-call
-  if(players[0].hand.length === 1){ setStatus('You have 1 card - press UNO to call!'); }
-  if(players[0].hand.length === 0){ showVictory('You'); }
-  renderAll();
+function drawCard() {
+  if (deck.length === 0) reshuffle();
+  return deck.pop();
 }
 
-/* ========= Apply card effects ========= */
-function applyEffect(pid, card){
-  if(card.value === 'skip'){
-    sfxSkip();
-    log(`${players[getNext(pid)].name} is skipped`);
-    current = getNext(getNext(pid));
-  } else if(card.value === 'reverse'){
-    sfxReverse();
-    direction *= -1;
-    log('Direction reversed');
-    if(players.length === 2) current = getNext(getNext(pid)); else current = getNext(pid);
-  } else if(card.value === 'draw2'){
-    const nxt = getNext(pid);
-    sfxDraw(); drawCards(nxt, 2);
-    log(`${players[nxt].name} draws 2`);
-    current = getNext(nxt);
-  } else if(card.value === 'wild4'){
-    const nxt = getNext(pid);
-    sfxDraw(); drawCards(nxt,4);
-    log(`${players[nxt].name} draws 4`);
-    current = getNext(nxt);
-  } else {
-    current = getNext(pid);
-  }
-  updateTurn();
+function reshuffle() {
+  log("Reshuffling deck...");
+  const keep = topCard;
+  buildDeck();
+  deck = deck.filter(c => !(c.color === keep.color && c.value === keep.value));
+  shuffle(deck);
 }
 
-/* ========= Draw logic ========= */
-function drawCards(playerIndex, count){
-  for(let i=0;i<count;i++){
-    reshuffleIfNeeded();
-    if(deck.length === 0) return;
-    const c = deck.pop();
-    players[playerIndex].hand.push(c);
-    if(playerIndex===0) animateDraw(c);
-  }
-  sfxDraw();
-  renderAll();
+/* --- Rendering --- */
+function renderAll() {
+  renderTopCard();
+  renderHands();
 }
 
-/* Player clicks Draw button */
-drawBtn.addEventListener('click', ()=>{
-  if(current !== 0) { setStatus('Not your turn'); return; }
-  if(busy) return;
-  busy = true;
-  reshuffleIfNeeded();
-  if(deck.length === 0){ setStatus('No cards to draw'); busy=false; return; }
-  const c = deck.pop(); players[0].hand.push(c); sfxDraw(); renderAll();
-  log('You drew a card');
-  // if playable, let player choose; otherwise end turn after a brief pause
-  if(canPlayCard(c,0)){
-    setStatus('You drew a playable card — you may play it');
-    busy = false;
-  } else {
-    setTimeout(()=>{ current = getNext(current); updateTurn(); busy=false; }, 700);
-  }
-});
+function renderTopCard() {
+  const el = document.getElementById("top-card");
+  el.className = `card ${topCard.color}`;
+  el.textContent = topCard.value.toUpperCase();
+}
 
-/* ========= UNO button ========= */
-unoBtn.addEventListener('click', ()=>{
-  if(players[0].hand.length === 1){
-    players[0].unoCalled = true;
-    sfxUno();
-    log('You called UNO!');
-    setStatus('UNO!');
-  } else {
-    setStatus('You can only call UNO when you have 1 card');
+function renderHands() {
+  for (let i = 0; i < players.length; i++) {
+    const handDiv = document.getElementById(`hand-${i}`);
+    handDiv.innerHTML = "";
+    const p = players[i];
+    p.hand.forEach((card, idx) => {
+      const c = document.createElement("div");
+      c.className = `card ${card.color}`;
+      c.textContent = i === 0 ? card.value.toUpperCase() : "UNO";
+      if (i === 0 && canPlayCard(card)) {
+        c.onclick = () => playerPlay(idx);
+      }
+      handDiv.appendChild(c);
+    });
+    document.getElementById(`count-${i}`).textContent = `${p.hand.length} cards`;
   }
-});
+}
 
-/* ========= Wild color picker ========= */
-function showColorPicker(){ colorPicker.classList.remove('hidden'); }
-function hideColorPicker(){ colorPicker.classList.add('hidden'); }
-colorBtns.forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    const color = btn.getAttribute('data-color');
-    chooseColor(color);
-  });
-});
-function chooseColor(color){
-  hideColorPicker();
-  if(!waitingColor) return;
-  const {playerIndex, played} = waitingColor;
-  played.chosenColor = color;
-  topColor = color; topValue = played.value;
+/* --- Initialization --- */
+function initGame() {
+  buildDeck();
+  players = [];
+  for (let i = 0; i < 4; i++) players.push({ hand: [] });
+  for (let i = 0; i < 7; i++) players.forEach(p => p.hand.push(drawCard()));
+  topCard = drawCard();
+  topColor = topCard.color;
+  current = 0;
+  direction = 1;
   waitingColor = null;
-  sfxPlay();
-  log(`${players[playerIndex].name} chose ${color.toUpperCase()}`);
-  // apply special effect for wild4 vs wild
-  if(played.value === 'wild'){
-    current = getNext(playerIndex);
-  } else if(played.value === 'wild4'){
-    const nxt = getNext(playerIndex);
-    drawCards(nxt,4);
-    log(`${players[nxt].name} draws 4`);
-    current = getNext(nxt);
-  }
+  busy = false;
+  renderAll();
+  log("Game started.");
   updateTurn();
 }
 
-/* ========= AI logic ========= */
-async function aiTurn(){
-  if(current===0) return;
-  if(busy) return;
+/* --- Game logic --- */
+function canPlayCard(card) {
+  return (
+    card.color === topColor ||
+    card.value === topCard.value ||
+    card.color === "wild"
+  );
+}
+
+function getNextPlayer() {
+  return (current + direction + players.length) % players.length;
+}
+
+function applyCardEffect(card) {
+  switch (card.value) {
+    case "skip":
+      current = getNextPlayer();
+      break;
+    case "reverse":
+      direction *= -1;
+      if (players.length === 2) current = getNextPlayer();
+      break;
+    case "draw2":
+      const target = getNextPlayer();
+      for (let i = 0; i < 2; i++) players[target].hand.push(drawCard());
+      current = target;
+      break;
+    case "wild4":
+      const next = getNextPlayer();
+      for (let i = 0; i < 4; i++) players[next].hand.push(drawCard());
+      current = next;
+      break;
+  }
+}
+
+function endTurn() {
+  current = getNextPlayer();
+  updateTurn();
+}
+
+/* --- Player actions --- */
+async function playerPlay(idx) {
+  if (busy || waitingColor) return;
+  const card = players[0].hand[idx];
+  if (!canPlayCard(card)) return;
   busy = true;
+  playCard(card, 0);
+  players[0].hand.splice(idx, 1);
+  renderAll();
+  await handleAfterPlay(card, 0);
+  busy = false;
+}
+
+function playCard(card, pid) {
+  topCard = { ...card };
+  topColor = card.color === "wild" ? topColor : card.color;
+}
+
+async function handleAfterPlay(card, pid) {
+  if (card.color === "wild") {
+    if (pid === 0) {
+      waitingColor = true;
+      await chooseColorUI();
+      waitingColor = false;
+    } else {
+      await aiChooseColor(pid, card);
+    }
+  }
+  applyCardEffect(card);
+  renderAll();
+  await sleep(600);
+  if (players[pid].hand.length === 0) {
+    alert(pid === 0 ? "You win!" : `Player ${pid + 1} wins!`);
+    return initGame();
+  }
+  endTurn();
+}
+
+async function chooseColorUI() {
+  return new Promise(resolve => {
+    const colors = ["red", "yellow", "green", "blue"];
+    const picker = document.getElementById("color-picker");
+    picker.style.display = "flex";
+    colors.forEach(color => {
+      const btn = document.getElementById(`pick-${color}`);
+      btn.onclick = () => {
+        topColor = color;
+        picker.style.display = "none";
+        resolve();
+      };
+    });
+  });
+}
+
+/* --- AI Logic --- */
+async function aiTurn() {
   const pid = current;
   const p = players[pid];
-  // think delay 1.0 - 1.5s
-  const delay = 1000 + Math.random()*500;
-  await new Promise(r=>setTimeout(r, delay));
-  // find playable indices
-  const playable = [];
-  for(let i=0;i<p.hand.length;i++) if(canPlayCard(p.hand[i], pid)) playable.push(i);
-  if(playable.length === 0){
-    // draw one
-    reshuffleIfNeeded();
-    if(deck.length>0){
-      const c = deck.pop(); p.hand.push(c); sfxDraw(); log(`${p.name} drew a card`);
-      renderAll();
-      // if playable, 70% chance to play immediately
-      if(canPlayCard(c,pid) && Math.random()<0.7){
-        const idx = p.hand.indexOf(c);
-        // play
-        await aiPlayIndex(pid, idx);
-        busy = false;
-        return;
-      }
-    }
-    // else end turn
-    current = getNext(current);
-    busy = false;
-    updateTurn();
-    return;
-  }
-  // choose best card
-  let bestIdx = playable[0], bestScore = -999;
-  for(const idx of playable){
-    const c = p.hand[idx];
-    let score = 0;
-    if(c.color !== 'wild' && c.color === topColor) score += 5;
-    if(c.value === topValue) score += 3;
-    if(['skip','reverse','draw2','wild4'].includes(c.value)) score += 2;
-    if(c.color === 'wild' && c.value === 'wild') score += 1;
-    // if opponents low on cards, prefer action
-    const opponent = players.reduce((acc,pl,ix)=> ix !== pid && pl.hand.length < acc.handLength ? {handLength:pl.hand.length, idx:ix} : acc, {handLength:999, idx:-1});
-    if(opponent.handLength <= 2 && ['draw2','wild4','skip','reverse'].includes(c.value)) score += 3;
-    if(score > bestScore){ bestScore = score; bestIdx = idx; }
-  }
-  // If best card is wild, pick color strategically
-  const chosenCard = p.hand[bestIdx];
-  if(chosenCard.color === 'wild'){
-    // ensure wild4 legality
-    if(chosenCard.value === 'wild4'){
-      const hasColorMatch = p.hand.some((h,i) => i!==bestIdx && h.color===topColor && h.color!=='wild');
-      if(hasColorMatch){
-        // fallback to non-wild if available
-        const alt = playable.find(i => p.hand[i].color !== 'wild');
-        if(typeof alt !== 'undefined') { bestIdx = alt; }
-      }
-    }
-  }
-  // play chosen
-  if(p.hand[bestIdx].color === 'wild'){
-    // choose color: most frequent color in hand
-    const counts = {red:0,yellow:0,green:0,blue:0};
-    for(const h of p.hand) if(h.color && h.color!=='wild') counts[h.color]++;
-    let pick='red', best=-1;
-    for(const k of ['red','yellow','green','blue']) if(counts[k] > best){ best=counts[k]; pick=k; }
-    // act like choosing color and playing
-    await aiPlayWild(pid, bestIdx, pick);
-    busy = false;
-    return;
-  } else {
-    await aiPlayIndex(pid, bestIdx);
-    busy = false;
-    return;
-  }
-}
-
-async function aiPlayIndex(pid, idx){
-  // remove, push discard
-  const [played] = players[pid].hand.splice(idx,1);
-  discard.push(played);
-  animatePlay(played, pid);
-  sfxPlay();
-  log(`${players[pid].name} played ${cardText(played)}`);
-  // apply effect (slight delay to let animation show)
-  await new Promise(r=>setTimeout(r, 420));
-  if(played.value === 'skip'){ sfxSkip(); log(`${players[getNext(pid)].name} is skipped`); current = getNext(getNext(pid)); }
-  else if(played.value === 'reverse'){ sfxReverse(); direction *= -1; log('Direction reversed'); if(players.length===2) current = getNext(getNext(pid)); else current = getNext(pid); }
-  else if(played.value === 'draw2'){ const nxt = getNext(pid); sfxDraw(); drawCards(nxt,2); log(`${players[nxt].name} draws 2`); current = getNext(nxt); }
-  else { topColor = played.color; topValue = played.value; current = getNext(pid); }
-  // UNO auto-call for AI
-  if(players[pid].hand.length === 1){ players[pid].unoCalled = true; sfxUno(); log(`${players[pid].name} called UNO!`); }
-  renderAll();
-  // if next is AI, continue chain handled by updateTurn()
-  updateTurn();
-}
-
-async function aiPlayWild(pid, idx, chosenColor){
-  const [played] = players[pid].hand.splice(idx,1);
-  played.chosenColor = chosenColor;
-  discard.push(played);
-  animatePlay(played, pid);
-  sfxPlay();
-  log(`${players[pid].name} played ${played.value} and chose ${chosenColor.toUpperCase()}`);
-  await new Promise(r=>setTimeout(r,420));
-  if(played.value === 'wild'){ topColor = chosenColor; topValue = 'wild'; current = getNext(pid); }
-  else if(played.value === 'wild4'){ topColor = chosenColor; topValue = 'wild4'; const nxt = getNext(pid); sfxDraw(); drawCards(nxt,4); log(`${players[nxt].name} draws 4`); current = getNext(nxt); }
-  if(players[pid].hand.length === 1){ players[pid].unoCalled = true; sfxUno(); log(`${players[pid].name} called UNO!`); }
-  renderAll(); updateTurn();
-}
-
-/* ========= Animations ========= */
-function animatePlay(card, playerIndex){
-  const el = document.createElement('div');
-  el.className = 'playedFloating ' + cardClass(card);
-  el.innerHTML = `<div style="padding:8px;font-weight:900;font-size:22px">${cardSymbol(card)}</div>`;
-  document.body.appendChild(el);
-  // compute start position
-  const boardRect = board.getBoundingClientRect();
-  let startX = boardRect.left + boardRect.width/2;
-  let startY = boardRect.top + boardRect.height/2;
-  if(playerIndex === 0){
-    const ph = document.getElementById('playerHand').getBoundingClientRect();
-    startX = ph.left + ph.width/2;
-    startY = ph.top + 20;
-  } else {
-    const slots = document.querySelectorAll('.aiSlot');
-    const slot = slots[playerIndex-1];
-    if(slot){ const r=slot.getBoundingClientRect(); startX=r.left + r.width/2; startY=r.top + r.height/2; }
-  }
-  el.style.left = (startX - 44) + 'px';
-  el.style.top = (startY - 62) + 'px';
-  el.style.width = '92px'; el.style.height = '128px'; el.style.opacity = '1';
-  // destination: discardTop center
-  const dest = discardTop.getBoundingClientRect();
-  const destX = dest.left + dest.width/2 - 44;
-  const destY = dest.top + dest.height/2 - 62;
-  requestAnimationFrame(()=>{ el.style.transform = `translate(${destX - (startX - 44)}px, ${destY - (startY - 62)}px) scale(.96)`; el.style.transition='transform .52s cubic-bezier(.17,.67,.32,1), opacity .4s ease'; });
-  setTimeout(()=>{ el.remove(); renderPiles(); }, 520);
-}
-function animateDraw(card){
-  const ph = document.getElementById('playerHand').getBoundingClientRect();
-  const el = document.createElement('div');
-  el.className = 'playedFloating ' + cardClass(card);
-  el.innerHTML = `<div style="padding:8px;font-weight:900;font-size:22px">${cardSymbol(card)}</div>`;
-  document.body.appendChild(el);
-  const boardRect = board.getBoundingClientRect();
-  const startX = boardRect.left + boardRect.width/2;
-  const startY = boardRect.top + boardRect.height/2;
-  el.style.left = (startX - 44) + 'px'; el.style.top = (startY - 62) + 'px'; el.style.width='92px'; el.style.height='128px';
-  const destX = ph.left + 40; const destY = ph.top - 20;
-  requestAnimationFrame(()=>{ el.style.transform = `translate(${destX - (startX - 44)}px, ${destY - (startY - 62)}px) scale(.8)`; el.style.transition='transform .44s cubic-bezier(.17,.67,.32,1), opacity .4s ease'; });
-  setTimeout(()=> el.remove(), 480);
-}
-
-/* ========= UNO penalty check ========= */
-function checkUnoPenalty(byPlayer){
-  for(let i=0;i<players.length;i++){
-    if(i===byPlayer) continue;
-    if(players[i].hand.length === 1 && !players[i].unoCalled){
-      drawCards(i,2);
-      log(`${players[i].name} forgot UNO and draws 2`);
-      sfxDraw();
-      players[i].unoCalled = false;
-    }
-  }
-}
-
-/* ========= Victory overlay ========= */
-function showVictory(name){
-  victoryOverlay.classList.remove('hidden');
-  victoryOverlay.innerHTML = `<div style="font-size:24px;margin-bottom:8px">${name} Wins!</div><div style="margin-top:8px"><button id="restartBtn">Restart</button></div>`;
-  document.getElementById('restartBtn').addEventListener('click', ()=>{
-    victoryOverlay.classList.add('hidden'); startGame();
-  });
-  setStatus(`${name} wins!`);
   busy = true;
-  sfxWin();
+  await sleep(800 + Math.random() * 500);
+
+  const playable = p.hand.filter(c => canPlayCard(c));
+  if (playable.length === 0) {
+    const drawn = drawCard();
+    p.hand.push(drawn);
+    renderAll();
+    await sleep(600);
+    if (canPlayCard(drawn)) {
+      await aiPlayCard(pid, drawn);
+    } else {
+      busy = false;
+      endTurn();
+    }
+    return;
+  }
+
+  // Pick card with priority: draw4 > draw2 > skip > reverse > number
+  const choice = playable.find(c => c.value === "wild4") ||
+                 playable.find(c => c.value === "draw2") ||
+                 playable.find(c => c.value === "skip") ||
+                 playable.find(c => c.value === "reverse") ||
+                 playable[Math.floor(Math.random() * playable.length)];
+
+  await aiPlayCard(pid, choice);
+  busy = false;
 }
 
-/* ========= Helpers ========= */
-function cardText(c){ if(!c) return ''; if(c.value==='skip') return `${c.color} SKIP`; if(c.value==='reverse') return `${c.color} REVERSE`; if(c.value==='draw2') return `${c.color} +2`; if(c.value==='wild') return 'WILD'; if(c.value==='wild4') return 'WILD +4'; return `${c.color} ${c.value}`; }
+async function aiPlayCard(pid, card) {
+  const p = players[pid];
+  const idx = p.hand.findIndex(c => c === card);
+  if (idx !== -1) p.hand.splice(idx, 1);
+  playCard(card, pid);
+  renderAll();
+  log(`AI ${pid} played ${card.color} ${card.value}`);
+  await handleAfterPlay(card, pid);
+}
 
-/* ========= Event hooks ========= */
-startBtn.addEventListener('click', ()=> startGame());
-newBtn.addEventListener('click', ()=> startGame());
-board.addEventListener('click', ()=> ensureAudio(), {once:true});
-drawBtn.addEventListener('click', ()=> { if(current===0 && !busy){ drawBtn.disabled=true; drawBtnTimeout(); } });
-function drawBtnTimeout(){ // wrapper to respect busy flow
-  setTimeout(()=> drawBtn.disabled=false, 900);
-  // actual draw handled earlier
-});
-unoBtn.addEventListener('click', ()=> {
-  if(players[0].hand.length === 1){ players[0].unoCalled = true; sfxUno(); log('You called UNO!'); setStatus('UNO!'); } else setStatus('You can only call UNO when you have 1 card');
-});
-colorBtns.forEach(b => b.addEventListener('click', ()=> {
-  const c = b.getAttribute('data-color');
-  chooseColor(c);
-}));
+async function aiChooseColor(pid, card) {
+  const counts = {};
+  for (const c of players[pid].hand) {
+    if (c.color === "wild") continue;
+    counts[c.color] = (counts[c.color] || 0) + 1;
+  }
+  const bestColor = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "red";
+  topColor = bestColor;
+  log(`AI ${pid} chose ${bestColor}`);
+  await sleep(500);
+}
 
-/* ========= Start with hint ========= */
-(function init(){
-  setStatus('Choose AI count and press Start. Click board to enable audio.');
-  document.querySelector('#drawBack').innerText = '0';
-  discardTop.innerText = '';
-})();
+/* --- Turn loop --- */
+async function updateTurn() {
+  renderAll();
+  if (waitingColor || busy) return;
+  if (current === 0) {
+    log("Your turn!");
+  } else {
+    await aiTurn();
+  }
+}
 
+/* --- Start Game --- */
+window.onload = initGame;
 </script>
 </body>
 </html>
