@@ -3,890 +3,853 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>UNO Deluxe — Play vs AI (Single-file)</title>
+<title>UNO Deluxe — Polished (Play vs AI)</title>
 <style>
   :root{
-    --bg:#0b1220; --panel:#071827; --muted:#9fb0c8;
-    --red:#ef4444; --yellow:#f59e0b; --green:#10b981; --blue:#3b82f6; --black:#111827;
-    --card-w:72px; --card-h:100px;
+    --bg1:#06121a; --bg2:#041827;
+    --card-w:88px; --card-h:124px;
+    --red:#ef4444; --yellow:#f59e0b; --green:#10b981; --blue:#3b82f6; --wild:#111827;
+    --muted:#9fb0c8;
   }
-  *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e6eef8}
-  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071122,#021826)}
-  .wrap{max-width:1200px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 320px;gap:12px}
-  .board{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:14px;border-radius:12px;min-height:78vh;position:relative}
-  .panel{background:rgba(2,6,12,0.5);padding:12px;border-radius:10px}
+  *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#eaf6ff}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg1),var(--bg2))}
+  .container{max-width:1240px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 380px;gap:12px}
+  .board{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:12px;border-radius:12px;min-height:80vh;position:relative;overflow:hidden}
+  .panel{background:rgba(1,6,12,0.48);padding:12px;border-radius:10px}
+  .topRow{display:flex;justify-content:space-between;align-items:center;padding:8px}
+  .centerArea{display:flex;flex-direction:column;align-items:center;justify-content:center;margin-top:8px}
+  .piles{display:flex;gap:24px;align-items:center}
+  .pile{width:var(--card-w);height:var(--card-h);border-radius:12px;box-shadow:0 12px 36px rgba(2,6,12,0.6);display:flex;align-items:center;justify-content:center;position:relative;overflow:visible}
+  .cardBack{width:100%;height:100%;border-radius:12px;background:linear-gradient(180deg,#083b49,#042a37);display:flex;align-items:center;justify-content:center;color:#bfe7f8;font-weight:800;letter-spacing:1px}
+  #discardTop{width:100%;height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#021018}
+  .playersTop{display:flex;justify-content:center;gap:12px;align-items:flex-end;padding:12px}
+  .aiSlot{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .aiCards{display:flex;gap:6px}
+  .aiCard{width:28px;height:48px;border-radius:8px;background:#021826;box-shadow:inset 0 -6px 12px rgba(0,0,0,0.4)}
+  .statusBar{position:absolute;left:16px;top:12px;background:rgba(0,0,0,0.36);padding:8px;border-radius:8px}
+  .turnBadge{position:absolute;right:16px;top:12px;background:rgba(0,0,0,0.36);padding:8px;border-radius:8px}
+  .log{height:300px;overflow:auto;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;margin-top:10px;font-size:13px}
   .controls{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-  button{background:#0f1724;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
-  .bright{color:var(--muted)}
-  .topArea{display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:12px}
-  #piles{display:flex;gap:18px;align-items:center;justify-content:center;margin-top:18px}
-  .pile{width:var(--card-w);height:var(--card-h);border-radius:8px;box-shadow:0 8px 24px rgba(2,6,12,0.6);display:flex;align-items:center;justify-content:center;position:relative;overflow:visible}
-  .cardBack{width:100%;height:100%;border-radius:8px;background:linear-gradient(180deg,#072b3c,#041b26);display:flex;align-items:center;justify-content:center;color:#bfe7f8;font-weight:700}
-  #discard{display:flex;align-items:center;justify-content:center}
-  #discard .cardFace{width:100%;height:100%;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#021018;box-shadow:inset 0 -8px 24px rgba(0,0,0,0.08)}
-  #playersTop{display:flex;gap:12px;justify-content:center;align-items:end;margin-bottom:12px}
-  .aiHand{display:flex;gap:6px;align-items:end}
-  .aiCard{width:28px;height:42px;border-radius:6px;background:#041827;border:1px solid rgba(255,255,255,0.03);box-shadow:0 2px 8px rgba(0,0,0,0.6)}
-  #log{height:260px;overflow:auto;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;margin-top:8px}
-  #playerHand{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;display:flex;gap:10px;align-items:flex-end;padding:8px;background:transparent}
-  .handCard{width:var(--card-w);height:var(--card-h);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#021018;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease}
-  .handCard:hover{transform:translateY(-8px);box-shadow:0 18px 36px rgba(2,6,12,0.6)}
-  .small{font-size:13px;color:var(--muted)}
-  .big{font-size:18px;font-weight:700}
-  .colorLabel{display:inline-block;width:18px;height:18px;border-radius:4px;margin-right:6px;vertical-align:middle}
-  #wildColorPicker{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(3,6,9,0.94);padding:12px;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6)}
-  .colorBtn{width:44px;height:44px;border-radius:8px;cursor:pointer;border:2px solid rgba(0,0,0,0.2)}
-  .hud{position:absolute;left:16px;top:16px;background:rgba(0,0,0,0.35);padding:8px;border-radius:8px}
-  .centerHUD{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(0,0,0,0.35);padding:8px;border-radius:8px}
-  .actionNote{position:absolute;right:16px;top:16px;background:rgba(0,0,0,0.35);padding:8px;border-radius:8px}
-  .tiny{font-size:12px;color:var(--muted)}
-  @media(max-width:900px){
-    .wrap{grid-template-columns:1fr; padding:6px}
-    #playerHand{position:fixed;left:8px;transform:none;bottom:8px}
-  }
-  /* card face styles */
-  .face-red{background:linear-gradient(180deg,#ff6b6b,#ef4444);color:white}
-  .face-yellow{background:linear-gradient(180deg,#ffd86b,#f59e0b);color:#111}
-  .face-green{background:linear-gradient(180deg,#6ee7b7,#10b981);color:#021018}
-  .face-blue{background:linear-gradient(180deg,#93c5fd,#3b82f6);color:#021018}
-  .face-wild{background:linear-gradient(180deg,#333333,#111827);color:white}
-  .cardSym{font-size:22px; font-weight:900}
-  .playedAnim{animation: playedIn .28s ease;}
-  @keyframes playedIn { from { transform: translateY(20px) scale(0.9); opacity:0 } to { transform:translateY(0) scale(1); opacity:1 } }
-  .fadeOut{animation:fadeOut .45s ease forwards}
-  @keyframes fadeOut { to { opacity:0; transform: translateY(-10px) } }
+  button{background:#0b1620;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
+  select,input{padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:#eaf6ff}
+  .playerHandWrap{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;display:flex;gap:10px;align-items:flex-end;padding:8px;pointer-events:none}
+  .handCard{width:var(--card-w);height:var(--card-h);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;color:#021018;pointer-events:auto;cursor:pointer;transition:transform .22s cubic-bezier(.17,.67,.32,1), box-shadow .18s ease, opacity .18s ease}
+  .handCard:hover{transform:translateY(-10px) scale(1.02);box-shadow:0 26px 48px rgba(3,7,12,0.6)}
+  .face-red{background:linear-gradient(180deg,#ff7b7b,var(--red));color:white}
+  .face-yellow{background:linear-gradient(180deg,#ffde7a,var(--yellow));color:#021018}
+  .face-green{background:linear-gradient(180deg,#8cefc2,var(--green));color:#021018}
+  .face-blue{background:linear-gradient(180deg,#a7d3ff,var(--blue));color:#021018}
+  .face-wild{background:linear-gradient(180deg,#3a3a3a,var(--wild));color:white}
+  .cardSymbol{font-size:30px;line-height:1}
+  .cardSub{font-size:12px;color:rgba(0,0,0,0.35);margin-top:6px}
+  .glowActive{box-shadow:0 24px 60px rgba(125,211,252,0.12), 0 6px 18px rgba(125,211,252,0.06)}
+  .playedFloating{position:absolute;transition:transform .5s cubic-bezier(.17,.67,.32,1), opacity .4s ease;will-change:transform;z-index:999}
+  .fadeIn{animation:fadeIn .28s ease}
+  @keyframes fadeIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+  .reverseSpin{animation:spinRev 0.8s ease}
+  @keyframes spinRev{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .colorPickPanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(3,6,9,0.96);padding:12px;border-radius:12px;display:flex;gap:8px;z-index:1200}
+  .colorPickBtn{width:56px;height:56px;border-radius:8px;border:3px solid rgba(0,0,0,0.18);cursor:pointer;box-shadow:0 14px 40px rgba(0,0,0,0.6)}
+  .hidden{display:none}
+  .centerOverlay{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);pointer-events:none}
+  .victory{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(2,6,12,0.9);padding:18px;border-radius:12px;z-index:2000;text-align:center}
+  .mini{font-size:13px;color:var(--muted)}
+  @media(max-width:980px){ .container{grid-template-columns:1fr} .playerHandWrap{left:50%;transform:translateX(-50%);bottom:8px} }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="board panel" id="board">
-    <div class="hud small" id="status">Welcome to UNO — choose players and press New Game</div>
-    <div class="centerHUD small" id="turnInfo">Turn: -</div>
-    <div class="actionNote small" id="actionNote"></div>
+<div class="container">
+  <div class="board" id="board" tabindex="0">
+    <div class="statusBar mini" id="status">UNO Deluxe — select AI count and press Start</div>
+    <div class="turnBadge mini" id="turnBadge">Turn: -</div>
 
-    <div id="playersTop" class="small"></div>
+    <div class="playersTop" id="playersTop"></div>
 
-    <div id="piles">
-      <div class="pile" id="drawPile" title="Draw Pile"><div class="cardBack small">Deck</div></div>
-      <div class="pile" id="discard" title="Discard Pile"><div id="topDiscard" class="cardFace"></div></div>
-    </div>
-
-    <div id="wildColorPicker">
-      <div class="small" style="margin-bottom:8px">Pick a color</div>
-      <div style="display:flex;gap:8px">
-        <div class="colorBtn" id="pickRed" style="background:var(--red)"></div>
-        <div class="colorBtn" id="pickYellow" style="background:var(--yellow)"></div>
-        <div class="colorBtn" id="pickGreen" style="background:var(--green)"></div>
-        <div class="colorBtn" id="pickBlue" style="background:var(--blue)"></div>
+    <div class="centerArea">
+      <div id="centerAction" class="mini" style="margin-bottom:10px">Draw pile and discard</div>
+      <div class="piles">
+        <div class="pile" id="drawPile" title="Draw Pile"><div class="cardBack mini" id="drawBack">Deck</div></div>
+        <div class="pile" id="discardPile" title="Discard Pile"><div id="discardTop" style="width:100%;height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:900"></div></div>
       </div>
     </div>
+
+    <div id="playedArea" style="position:absolute;left:50%;top:40%;transform:translateX(-50%);pointer-events:none"></div>
+
+    <div id="colorPicker" class="colorPickPanel hidden">
+      <div class="mini" style="align-self:center;margin-right:6px">Choose color</div>
+      <div class="colorPickBtn face-red" data-color="red"></div>
+      <div class="colorPickBtn face-yellow" data-color="yellow"></div>
+      <div class="colorPickBtn face-green" data-color="green"></div>
+      <div class="colorPickBtn face-blue" data-color="blue"></div>
+    </div>
+
+    <div id="victoryOverlay" class="victory hidden"></div>
   </div>
 
-  <div class="panel">
+  <aside class="panel">
+    <div class="topRow">
+      <div>
+        <div class="mini">Players</div>
+        <div class="big" id="playersCountLabel">Human + 2 AIs</div>
+      </div>
+      <div>
+        <div class="mini">AI Mode</div>
+        <div class="mini">Realistic (1–1.5s)</div>
+      </div>
+    </div>
+
     <div class="controls">
-      <label class="small">AI Opponents:</label>
-      <select id="aiCount"><option value="2">2 AI (3 players)</option><option value="3">3 AI (4 players)</option></select>
-      <button id="newGameBtn">New Game</button>
+      <label class="mini">AI Opponents</label>
+      <select id="aiCountSelect"><option value="2">2 AI (3 players)</option><option value="3">3 AI (4 players)</option></select>
+      <button id="startBtn">Start</button>
+      <button id="newBtn">New Round</button>
+    </div>
+
+    <div style="margin-top:8px;">
       <button id="drawBtn">Draw Card</button>
       <button id="unoBtn">Call UNO</button>
     </div>
 
-    <div class="small" style="margin-bottom:6px">Game Messages</div>
-    <div id="log" class="small"></div>
-    <div style="margin-top:8px" class="small">Controls: Click your card to play (valid ones highlighted). Right now Wild Draw Four is disallowed if you have a matching color card.</div>
-    <div style="margin-top:12px" class="small">Sounds: enabled via Web Audio (no external files)</div>
-  </div>
+    <div style="margin-top:12px" class="mini">Log</div>
+    <div id="log" class="log mini"></div>
+
+  </aside>
 </div>
 
-<!-- Player hand container (fixed at bottom) -->
-<div id="playerHand"></div>
+<!-- Player hand overlay at bottom -->
+<div class="playerHandWrap" id="playerHand"></div>
 
 <script>
-/* UNO Deluxe — Single-file
-   Features:
-   - Full UNO deck (108 cards)
-   - 2 or 3 AI opponents selectable
-   - Classic colors (red, yellow, green, blue, wild)
-   - Animations & WebAudio-based sound effects
-   - Wild color chooser popup
-   - UNO button & penalty
-   - Prevent Wild Draw 4 illegal plays
+/* UNO Deluxe — Polished Single-file
+   - Full UNO deck
+   - Select AI count before start
+   - Vibrant cards, polished animations
+   - Realistic AI (1.0 - 1.5s delay)
+   - WebAudio synthesized sounds
+   Implementation notes and modular functions included.
 */
 
-/* -------------------------
-   Utilities & Sound (Web Audio)
-   ------------------------- */
-const logEl = document.getElementById('log');
-function log(msg){ const t = document.createElement('div'); t.innerText = msg; logEl.prepend(t); }
-
-// WebAudio context & helper functions to produce nicer sounds
+/* ------------------------------
+   Audio (WebAudio) - richer, layered
+   ------------------------------ */
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioCtx();
-function playToneSequence(params){
-  // params: array of {freq, dur, type, volume}
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx){ audioCtx = new AudioCtx(); if(audioCtx.state === 'suspended'){ const resume = ()=> audioCtx.resume(); window.addEventListener('click', resume, {once:true}); } }
+}
+function playMultiTones(seq){
+  if(!audioCtx) return;
   const now = audioCtx.currentTime;
-  let time = now;
-  for(const p of params){
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = p.type || 'sine';
-    osc.frequency.setValueAtTime(p.freq, time);
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime((p.volume||0.08), time + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + p.dur - 0.02);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(time); osc.stop(time + p.dur);
-    time += p.dur;
+  let t = now;
+  for(const s of seq){
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = s.type || 'sine';
+    o.frequency.setValueAtTime(s.freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime((s.vol||0.06), t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + s.dur - 0.02);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + s.dur);
+    t += s.dur;
   }
 }
+function sfxShuffle(){ ensureAudio(); playMultiTones([{freq:1400,dur:0.06,type:'sawtooth',vol:0.05},{freq:900,dur:0.08,type:'sawtooth',vol:0.05},{freq:700,dur:0.09,type:'sine',vol:0.04}]); }
+function sfxPlay(){ ensureAudio(); playMultiTones([{freq:880,dur:0.09,type:'triangle',vol:0.07},{freq:1320,dur:0.06,type:'sine',vol:0.05}]); }
+function sfxDraw(){ ensureAudio(); playMultiTones([{freq:540,dur:0.08,type:'sine',vol:0.06},{freq:700,dur:0.06,type:'sine',vol:0.045}]); }
+function sfxSkip(){ ensureAudio(); playMultiTones([{freq:420,dur:0.08,type:'square',vol:0.06},{freq:300,dur:0.05,type:'square',vol:0.045}]); }
+function sfxReverse(){ ensureAudio(); playMultiTones([{freq:720,dur:0.09,type:'triangle',vol:0.07},{freq:880,dur:0.08,type:'triangle',vol:0.055}]); }
+function sfxUno(){ ensureAudio(); playMultiTones([{freq:1000,dur:0.18,type:'sine',vol:0.09},{freq:1200,dur:0.12,type:'sine',vol:0.07}]); }
+function sfxWin(){ ensureAudio(); playMultiTones([{freq:880,dur:0.12,type:'triangle',vol:0.09},{freq:1100,dur:0.10,type:'triangle',vol:0.08},{freq:1320,dur:0.14,type:'sawtooth',vol:0.1}]); }
 
-// richer effects
-function playShuffle(){
-  // multiple descending noise-like blips
-  const seq = [
-    {freq:1200, dur:0.06, type:'sawtooth', volume:0.06},
-    {freq:900, dur:0.08, type:'sawtooth', volume:0.06},
-    {freq:700, dur:0.09, type:'sine', volume:0.05},
-    {freq:500, dur:0.12, type:'sine', volume:0.05}
-  ];
-  playToneSequence(seq);
-}
-function playCardPlay(){
-  playToneSequence([{freq:880,dur:0.09,type:'triangle',volume:0.06},{freq:1320,dur:0.06,type:'sine',volume:0.04}]);
-}
-function playDraw(){
-  playToneSequence([{freq:520,dur:0.07,type:'sine',volume:0.06},{freq:680,dur:0.06,type:'sine',volume:0.04}]);
-}
-function playSkip(){
-  playToneSequence([{freq:420,dur:0.08,type:'square',volume:0.06},{freq:320,dur:0.05,type:'square',volume:0.05}]);
-}
-function playReverse(){
-  playToneSequence([{freq:720,dur:0.09,type:'triangle',volume:0.06},{freq:880,dur:0.08,type:'triangle',volume:0.05}]);
-}
-function playUnoCall(){
-  playToneSequence([{freq:1000,dur:0.18,type:'sine',volume:0.09},{freq:1200,dur:0.12,type:'sine',volume:0.07}]);
-}
-function playVictory(){
-  playToneSequence([{freq:880,dur:0.12,type:'triangle',volume:0.09},{freq:1100,dur:0.10,type:'triangle',volume:0.08},{freq:1320,dur:0.14,type:'sawtooth',volume:0.1}]);
-}
-
-/* -------------------------
-   Representing cards & deck
-   ------------------------- */
-/*
- Card object: {color: 'red'|'yellow'|'green'|'blue'|'wild', value: '0'..'9' | 'skip' | 'reverse' | 'draw2' | 'wild' | 'wild4'}
-*/
-function createFullDeck(){
-  const colors = ['red','yellow','green','blue'];
+/* ------------------------------
+   Deck & Card utilities
+   ------------------------------ */
+const COLORS = ['red','yellow','green','blue'];
+function createDeck(){
   const deck = [];
-  // Number cards: one 0 per color, two of 1-9 per color
-  for(const c of colors){
+  // numbers & duplicates per UNO rules
+  for(const c of COLORS){
     deck.push({color:c, value:'0'});
     for(let n=1;n<=9;n++){
-      deck.push({color:c, value: String(n)});
-      deck.push({color:c, value: String(n)});
+      deck.push({color:c, value:String(n)});
+      deck.push({color:c, value:String(n)});
     }
-    // Action cards: two of each per color
     for(let i=0;i<2;i++){
       deck.push({color:c, value:'skip'});
       deck.push({color:c, value:'reverse'});
       deck.push({color:c, value:'draw2'});
     }
   }
-  // Wild cards: 4 wild, 4 wild draw four
+  // 4 wilds and 4 wild4s
   for(let i=0;i<4;i++) deck.push({color:'wild', value:'wild'});
   for(let i=0;i<4;i++) deck.push({color:'wild', value:'wild4'});
-  // total should be 108
   return deck;
 }
-function shuffleDeck(deck){
-  // Fisher-Yates
-  for(let i=deck.length-1;i>0;i--){
+function shuffle(array){
+  for(let i = array.length -1; i>0; i--){
     const j = Math.floor(Math.random()*(i+1));
-    [deck[i],deck[j]] = [deck[j],deck[i]];
+    [array[i],array[j]] = [array[j],array[i]];
   }
-  playShuffle();
-  return deck;
+  sfxShuffle();
+  return array;
 }
 
-/* -------------------------
-   Game state
-   ------------------------- */
-let deck = []; // draw pile
-let discard = []; // discard pile (top is last)
-let players = []; // array of {name, hand:[], isAI:true/false, unoCalled:false}
-let currentPlayer = 0;
-let playDirection = 1; // 1 for clockwise, -1 for counterclockwise
-let topColor = null; // effective color for matching (when wild chosen)
-let topValue = null;
-let skipNext = false;
-let drawStack = 0; // stacking draw2/draw4? We'll implement standard: draw effects applied, not stacking
-let waitingColorPick = null; // when someone played wild/wild4 and needs to pick color
-let aiCountSelect = document.getElementById('aiCount');
+/* ------------------------------
+   Game state variables
+   ------------------------------ */
+let deck = [], discard = [];
+let players = []; // {name, hand:[], isAI}
+let current = 0, direction = 1; // 1 clockwise, -1 counter
+let topColor = null, topValue = null;
+let waitingColorChoice = null; // {playerIndex, cardIndex}
+let aiCount = 2;
+let busy = false; // prevents input during animations
+let unoPenaltyActive = true;
 
-/* -------------------------
-   UI references
-   ------------------------- */
+/* ------------------------------
+   DOM refs
+   ------------------------------ */
+const board = document.getElementById('board');
+const drawPileEl = document.getElementById('drawPile');
+const discardTopEl = document.getElementById('discardTop');
+const playersTopEl = document.getElementById('playersTop');
+const playerHandWrap = document.getElementById('playerHand');
+const logEl = document.getElementById('log');
+const statusEl = document.getElementById('status');
+const turnBadgeEl = document.getElementById('turnBadge');
+const startBtn = document.getElementById('startBtn');
+const newBtn = document.getElementById('newBtn');
 const drawBtn = document.getElementById('drawBtn');
 const unoBtn = document.getElementById('unoBtn');
-const newGameBtn = document.getElementById('newGameBtn');
-const playerHandEl = document.getElementById('playerHand');
-const drawPileEl = document.getElementById('drawPile');
-const discardEl = document.getElementById('topDiscard');
-const playersTopEl = document.getElementById('playersTop');
-const statusEl = document.getElementById('status');
-const turnInfoEl = document.getElementById('turnInfo');
-const actionNoteEl = document.getElementById('actionNote');
-const wildPicker = document.getElementById('wildColorPicker');
-const pickRed = document.getElementById('pickRed');
-const pickYellow = document.getElementById('pickYellow');
-const pickGreen = document.getElementById('pickGreen');
-const pickBlue = document.getElementById('pickBlue');
+const aiCountSelect = document.getElementById('aiCountSelect');
+const playersCountLabel = document.getElementById('playersCountLabel');
+const colorPicker = document.getElementById('colorPicker');
+const colorBtns = document.querySelectorAll('.colorPickBtn');
+const playedArea = document.getElementById('playedArea');
+const victoryOverlay = document.getElementById('victoryOverlay');
 
-/* -------------------------
-   Helper functions
-   ------------------------- */
-function cardHTML(card){
+/* ------------------------------
+   Helpers: logging & UI
+   ------------------------------ */
+function log(msg){
+  const d = document.createElement('div'); d.innerText = msg; logEl.prepend(d);
+}
+function setStatus(msg){
+  statusEl.innerText = msg;
+}
+function setTurnBadge(){
+  turnBadgeEl.innerText = `Turn: ${players[current].name}`;
+  // highlight active player slot
+  const slots = document.querySelectorAll('.aiSlot');
+  slots.forEach((s,idx)=> s.style.filter = ( (idx+1) % players.length === current ? 'drop-shadow(0 12px 36px rgba(125,211,252,0.12))' : 'none' ));
+}
+function cardDisplay(card){
   if(!card) return '';
-  const cls = card.color==='wild' ? 'face-wild' : (card.color==='red'?'face-red':(card.color==='yellow'?'face-yellow':(card.color==='green'?'face-green':'face-blue')));
-  const display = (card.value==='skip' ? '⏭' : (card.value==='reverse'?'⤾':(card.value==='draw2'?'+2':(card.value==='wild'?'★':(card.value==='wild4'?'+4':card.value)))));
-  return `<div class="cardFace ${cls}"><div class="cardSym">${display}</div></div>`;
+  if(card.color === 'wild'){
+    if(card.value === 'wild') return '★';
+    return '+4';
+  }
+  if(card.value === 'skip') return '⏭';
+  if(card.value === 'reverse') return '⤾';
+  if(card.value === 'draw2') return '+2';
+  return card.value;
 }
-function updateTopDiscard(){
+function cardClass(card){
+  if(!card) return '';
+  if(card.color==='wild') return 'face-wild';
+  return card.color === 'red' ? 'face-red' : card.color === 'yellow' ? 'face-yellow' : card.color === 'green' ? 'face-green' : 'face-blue';
+}
+function renderDiscardTop(){
   const top = discard[discard.length-1];
-  discardEl.innerHTML = cardHTML(top);
-  // update turn text color possibly
-  if(top){
-    topColor = (top.color==='wild' && top.chosenColor) ? top.chosenColor : top.color;
-    topValue = top.value;
-  } else { topColor = null; topValue = null; }
+  if(!top){ discardTopEl.innerHTML = ''; topColor=topValue=null; return; }
+  // if chosenColor set (for wild), use that color visually
+  let displayColor = top.color;
+  if(top.color==='wild' && top.chosenColor) displayColor = top.chosenColor;
+  const tempCard = {...top, color: displayColor};
+  discardTopEl.innerHTML = `<div style="width:100%;height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center" class="${cardClass(tempCard)}"><div style="font-size:28px">${cardDisplay(tempCard)}</div></div>`;
+  topColor = displayColor;
+  topValue = top.value;
+}
+function renderPiles(){
+  document.querySelector('#drawPile .cardBack').innerText = deck.length;
+  renderDiscardTop();
+}
+function disableInput(){
+  busy = true;
+}
+function enableInput(){
+  busy = false;
 }
 
-/* -------------------------
-   Start New Game
-   ------------------------- */
-function newGame(){
-  // init
-  deck = shuffleDeck(createFullDeck());
-  discard = [];
+/* ------------------------------
+   Start / New round
+   ------------------------------ */
+function startGame(){
+  ensureAudio();
+  aiCount = parseInt(aiCountSelect.value,10);
   players = [];
-  const aiCount = parseInt(aiCountSelect.value,10);
-  // human player at index 0
   players.push({name:'You', hand:[], isAI:false, unoCalled:false});
-  for(let i=1;i<=aiCount;i++) players.push({name: 'AI ' + i, hand:[], isAI:true, unoCalled:false});
-  currentPlayer = 0; playDirection = 1; drawStack = 0; waitingColorPick = null;
-  // deal 7 each
+  for(let i=1;i<=aiCount;i++) players.push({name:`AI ${i}`, hand:[], isAI:true, unoCalled:false});
+  playersCountLabel.innerText = `Human + ${aiCount} AI`;
+  // build deck
+  deck = shuffle(createDeck());
+  discard = [];
+  // deal 7 cards
   for(let r=0;r<7;r++){
     for(let p=0;p<players.length;p++){
       players[p].hand.push(deck.pop());
     }
   }
-  // flip first non-wild card to start
-  let first = deck.pop();
-  while(first.value==='wild' || first.value==='wild4'){
-    deck.unshift(first); // put back deeper
-    shuffleDeck(deck); // shuffle again
-    first = deck.pop();
+  // flip a starting card that is not wild/wild4
+  let starter = deck.pop();
+  while(starter.value === 'wild' || starter.value === 'wild4'){ deck.unshift(starter); shuffle(deck); starter = deck.pop(); }
+  discard.push(starter);
+  renderDiscardTop();
+  // reset
+  current = 0; direction = 1;
+  // apply initial action
+  renderAll();
+  setStatus('Game started');
+  log('Game started. Top is ' + cardText(starter));
+  // apply initial effects (skip/reverse/draw2)
+  if(starter.value === 'skip'){ log('Initial card skip - first player is skipped'); current = getNext(current); }
+  else if(starter.value === 'reverse'){ direction *= -1; log('Initial card reverse - direction changed'); }
+  else if(starter.value === 'draw2'){ const nxt = getNext(current); drawCards(nxt,2); log(`${players[nxt].name} draws 2 from initial card`); current = getNext(nxt); }
+  renderAll();
+  updateTurnUI();
+}
+
+/* ------------------------------
+   Utility functions
+   ------------------------------ */
+function cardText(card){
+  if(!card) return '';
+  if(card.value === 'skip') return `${card.color} SKIP`;
+  if(card.value === 'reverse') return `${card.color} REVERSE`;
+  if(card.value === 'draw2') return `${card.color} +2`;
+  if(card.value === 'wild') return `WILD`;
+  if(card.value === 'wild4') return `WILD +4`;
+  return `${card.color} ${card.value}`;
+}
+function getNext(index){ return (index + direction + players.length) % players.length; }
+function findPlayableIndices(hand, playerIndex){
+  const out = [];
+  for(let i=0;i<hand.length;i++){
+    if(canPlayCard(hand[i], playerIndex)) out.push(i);
   }
-  discard.push(first);
-  updateTopDiscard();
-  // reset UNO call flags
-  players.forEach(p=>p.unoCalled=false);
-  // render UI
-  renderPlayersTop();
-  renderPlayerHand();
-  updateStatus('New game started');
-  log('Game started. Top card: ' + cardText(first));
-  // apply initial action if first card is action (skip/draw2/reverse)
-  if(first.value === 'skip'){
-    advanceTurn();
-    updateStatus('First card was Skip — first player skipped');
-  } else if(first.value === 'reverse'){
-    playDirection *= -1;
-    updateStatus('Play direction reversed by initial card');
-  } else if(first.value === 'draw2'){
-    // next player draws two and misses turn
-    const next = getNextIndex(currentPlayer);
-    drawCardsForPlayer(next, 2);
-    advanceTurn();
-    updateStatus('First card was Draw Two — next player drew 2 and skipped');
-  }
-  updateTopDiscard();
-  renderPlayersTop();
-  renderPlayerHand();
-  renderPiles();
-  updateTurnInfo();
+  return out;
 }
-
-/* -------------------------
-   Utilities - indexing & rotation
-   ------------------------- */
-function getNextIndex(idx){
-  return (idx + playDirection + players.length) % players.length;
-}
-function advanceTurn(){
-  currentPlayer = getNextIndex(currentPlayer);
-  // reset UNO flags if needed
-  players.forEach(p=>{ if(p.hand.length !== 1) p.unoCalled = false; });
-}
-
-/* -------------------------
-   Actions: draw, play, apply effects
-   ------------------------- */
-function drawCardsForPlayer(pid, count){
-  for(let i=0;i<count;i++){
-    if(deck.length === 0) reshuffleDiscardIntoDeck();
-    if(deck.length === 0) { log('No cards left to draw'); break; }
-    const c = deck.pop();
-    players[pid].hand.push(c);
-    if(pid === 0){
-      animateDrawCardToHand(c);
-    }
-  }
-  playDraw();
-  renderPlayerHand();
-  renderPlayersTop();
-  renderPiles();
-}
-
-function reshuffleDiscardIntoDeck(){
-  if(discard.length <= 1) return;
-  const top = discard.pop();
-  deck = shuffleDeck(discard.splice(0, discard.length));
-  discard = [top];
-  updateTopDiscard();
-  log('Reshuffled discard into deck');
-}
-
-function canPlayCard(card){
+function canPlayCard(card, playerIndex){
   if(!card) return false;
-  // wild/wild4 always playable by color matching rules? Wild is always playable; wild4 only if no card in hand matches topColor
+  // wild always playable; wild4 only if no card matches color (enforce rule)
   if(card.color === 'wild'){
     if(card.value === 'wild4'){
-      // check for illegal play: if player does have a card that matches current color, disallow wild4
-      const hand = players[0].hand;
+      const hand = players[playerIndex].hand;
       const hasColorMatch = hand.some(h => h.color === topColor && h.color !== 'wild');
       if(hasColorMatch) return false;
       return true;
     }
     return true;
   }
-  // color match OR value match OR number/symbol match
-  if(topColor === card.color) return true;
-  if(topValue === card.value) return true;
+  if(topColor === null) return true; // no top
+  if(card.color === topColor) return true;
+  if(card.value === topValue) return true;
   return false;
 }
 
-function aiCanPlayAny(pid){
-  const hand = players[pid].hand;
-  for(const c of hand){
-    if(aiCanPlayCard(pid, c)) return true;
+/* ------------------------------
+   Drawing / reshuffle
+   ------------------------------ */
+function reshuffleIfNeeded(){
+  if(deck.length === 0){
+    if(discard.length <= 1) return;
+    const top = discard.pop();
+    deck = shuffle(discard.splice(0, discard.length));
+    discard = [top];
+    renderPiles();
+    log('Reshuffled discard into deck');
   }
-  return false;
 }
-function aiCanPlayCard(pid, card){
-  // for AI, allow wild4 only if no color-match in hand
-  if(card.color === 'wild' && card.value === 'wild4'){
-    const hand = players[pid].hand;
-    const hasColorMatch = hand.some(h => h.color === topColor && h.color !== 'wild');
-    if(hasColorMatch) return false;
-    return true;
+function drawCards(playerIndex, count){
+  for(let i=0;i<count;i++){
+    reshuffleIfNeeded();
+    if(deck.length === 0) return;
+    const c = deck.pop();
+    players[playerIndex].hand.push(c);
+    // animation for human
+    if(playerIndex === 0) animateDraw(c);
   }
-  if(card.color === 'wild') return true;
-  if(topColor === card.color) return true;
-  if(topValue === card.value) return true;
-  return false;
+  sfxDraw();
+  renderAll();
 }
 
-function cardText(card){
-  if(!card) return '';
-  if(card.value === 'skip') return `${card.color.toUpperCase()} Skip`;
-  if(card.value === 'reverse') return `${card.color.toUpperCase()} Reverse`;
-  if(card.value === 'draw2') return `${card.color.toUpperCase()} +2`;
-  if(card.value === 'wild') return `Wild`;
-  if(card.value === 'wild4') return `Wild +4`;
-  return `${card.color.toUpperCase()} ${card.value}`;
-}
-
-function playCard(pid, cardIndex){
-  const hand = players[pid].hand;
+/* ------------------------------
+   Play card (with animations)
+   ------------------------------ */
+function playCard(playerIndex, cardIndex){
+  if(busy) return false;
+  if(playerIndex !== current) return false;
+  const hand = players[playerIndex].hand;
   if(cardIndex < 0 || cardIndex >= hand.length) return false;
   const card = hand[cardIndex];
-  // validation: player's turn?
-  if(pid !== currentPlayer) return false;
-  // if needs color pick (wild) show picker
-  if(card.color === 'wild'){
-    // for wild4 also check illegal play rule for human
-    if(card.value === 'wild4'){
-      // check if human/AI has matching color card in hand
-      const hasColorMatch = hand.some((h,idx) => h.color === topColor && h.color !== 'wild' && idx !== cardIndex);
-      if(hasColorMatch && pid === 0){
-        updateStatus('Illegal Wild Draw Four play — you have a matching color card.');
-        log('Illegal attempt: Wild Draw 4 when a color match exists.');
-        return false;
-      } else if(hasColorMatch && pid !== 0){
-        // AI shouldn't play it - disallow
-        return false;
-      }
-    }
-    // wait for color pick
-    waitingColorPick = {pid, cardIndex};
+  if(!canPlayCard(card, playerIndex)) { setStatus('Illegal play'); return false; }
+  // UNO penalty check BEFORE action: if someone else has 1 and didn't call UNO, penalize them now
+  checkUnoPenalty(playerIndex);
+  // remove from hand
+  const [played] = hand.splice(cardIndex,1);
+  // push to discard
+  discard.push(played);
+  // animate play
+  animatePlay(played, playerIndex);
+  sfxPlay();
+  log(`${players[playerIndex].name} played ${cardText(played)}`);
+  // handle special: wild needs color choice
+  if(played.color === 'wild'){
+    // wait for color selection UI
+    waitingColorChoice = {playerIndex, played};
     showColorPicker();
-    return true;
+    // mark topColor once chosen
   } else {
-    // regular colored card
-    if(pid === 0 && !canPlayCard(card)){ updateStatus('Cannot play that card now'); return false; }
-    if(pid !== 0 && !aiCanPlayCard(pid, card)) return false;
-    // move to discard
-    const played = hand.splice(cardIndex,1)[0];
-    discard.push(played);
-    updateTopDiscard();
-    playCardPlay();
-    log(`${players[pid].name} played ${cardText(played)}`);
-    // handle actions: skip, reverse, draw2
-    applyCardEffect(pid, played);
-    // UNO logic: if the player now has 1 card, require UNO call
-    if(players[pid].hand.length === 1 && !players[pid].unoCalled){
-      // for human, show reminder; for AI pick random chance to 'forget' (we'll let AI call UNO automatically most of time)
-      if(pid !== 0){ // AI auto-call
-        players[pid].unoCalled = true;
-        log(`${players[pid].name} called UNO!`);
-      } else {
-        updateActionNote('You have 1 card — press UNO button!', 3000);
-      }
-    }
-    // victory check
-    if(players[pid].hand.length === 0){
-      playVictory();
-      updateStatus(`${players[pid].name} wins the round!`);
-      log(`${players[pid].name} wins!`);
-      // highlight and disable draw/play
-      disableInteraction();
-      return true;
-    }
-    // advance turn logic depends on effect (some actions already advanced)
-    if(!['skip','draw2','wild4'].includes(played.value)){
-      // normal flow: go to next player
-      advanceTurn();
-    }
-    updateTurnInfo();
-    renderPlayerHand();
-    renderPlayersTop();
-    renderPiles();
-    return true;
+    // normal colored card
+    topColor = played.color;
+    topValue = played.value;
+    // apply action
+    setTimeout(()=> applyCardEffect(playerIndex, played), 420);
   }
+  // UNO auto-call for AI if they have 1 card
+  if(players[playerIndex].hand.length === 1 && players[playerIndex].isAI){
+    players[playerIndex].unoCalled = true;
+    sfxUno();
+    log(`${players[playerIndex].name} called UNO!`);
+  }
+  // check win
+  if(players[playerIndex].hand.length === 0){
+    // victory
+    sfxWin();
+    showVictory(players[playerIndex].name);
+  }
+  renderAll();
+  return true;
 }
 
+/* ------------------------------
+   Apply action effects after play
+   ------------------------------ */
 function applyCardEffect(pid, card){
-  // card already placed on discard
+  // process according to card.value
   if(card.value === 'skip'){
-    // skip next player
-    playSkip();
-    const skipped = getNextIndex(pid);
-    log(`${players[skipped].name} was skipped`);
-    // advance extra
-    advanceTurn(); // move to next player
-    advanceTurn(); // skip them
+    sfxSkip();
+    log(`${players[getNext(pid)].name} is skipped`);
+    current = getNext(getNext(pid)); // skip next player
   } else if(card.value === 'reverse'){
-    playReverse();
-    playDirection *= -1;
-    // If only two players, reverse acts as skip of opponent (UNO rule)
+    sfxReverse();
+    direction *= -1;
+    // if two players, reverse acts like skip (standard UNO)
     if(players.length === 2){
-      // reverse acts like skip
-      advanceTurn();
+      current = getNext(getNext(pid));
     } else {
-      // simply change direction and advance once
-      advanceTurn();
+      current = getNext(pid);
     }
   } else if(card.value === 'draw2'){
-    // next player draws two and loses turn
-    const next = getNextIndex(pid);
-    drawCardsForPlayer(next, 2);
-    advanceTurn(); // skip next
-    advanceTurn();
+    const nxt = getNext(pid);
+    sfxDraw();
+    drawCards(nxt, 2);
+    log(`${players[nxt].name} draws 2`);
+    current = getNext(nxt);
   } else if(card.value === 'wild4'){
-    // next player draws 4 and loses turn — chosen color is in card.chosenColor (set after color picker)
-    const next = getNextIndex(pid);
-    drawCardsForPlayer(next, 4);
-    advanceTurn();
-    advanceTurn();
+    const nxt = getNext(pid);
+    sfxDraw();
+    drawCards(nxt, 4);
+    log(`${players[nxt].name} draws 4`);
+    current = getNext(nxt);
   } else {
-    // normal number card -> just play
+    // number card or wild (wild handled separately)
+    current = getNext(pid);
   }
+  updateTurnUI();
 }
 
-/* -------------------------
-   Color picker & wild handling
-   ------------------------- */
+/* ------------------------------
+   Wild color selection
+   ------------------------------ */
 function showColorPicker(){
-  wildPicker.style.display = 'block';
+  colorPicker.classList.remove('hidden');
 }
 function hideColorPicker(){
-  wildPicker.style.display = 'none';
+  colorPicker.classList.add('hidden');
 }
+colorBtns.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const color = btn.getAttribute('data-color');
+    chooseColor(color);
+  });
+});
 function chooseColor(color){
-  if(!waitingColorPick) return;
-  const {pid, cardIndex} = waitingColorPick;
-  const hand = players[pid].hand;
-  const card = hand.splice(cardIndex,1)[0];
-  // set chosen color on card so discard shows it
-  card.chosenColor = color;
-  discard.push(card);
-  updateTopDiscard();
   hideColorPicker();
-  waitingColorPick = null;
-  playCardPlay();
-  log(`${players[pid].name} played ${card.value === 'wild' ? 'Wild' : 'Wild Draw 4'} and chose ${color.toUpperCase()}`);
-  // apply effect
-  if(card.value === 'wild'){
-    // no further immediate effect, advance turn
-    topColor = color;
-    advanceTurn();
-  } else if(card.value === 'wild4'){
-    // wild4: draw 4 to next and skip
-    topColor = color;
-    const next = getNextIndex(pid);
-    drawCardsForPlayer(next, 4);
-    advanceTurn(); // skip
-    advanceTurn();
+  if(!waitingColorChoice) return;
+  const {playerIndex, played} = waitingColorChoice;
+  played.chosenColor = color;
+  topColor = color;
+  topValue = played.value;
+  log(`${players[playerIndex].name} chose ${color.toUpperCase()}`);
+  // apply effect for wild and wild4
+  if(played.value === 'wild'){
+    current = getNext(playerIndex);
+  } else if(played.value === 'wild4'){
+    const nxt = getNext(playerIndex);
+    drawCards(nxt, 4);
+    log(`${players[nxt].name} draws 4`);
+    current = getNext(nxt);
   }
-  // UNO: if player ended with one card, prompt/auto-call
-  if(players[pid].hand.length === 1 && pid !== 0){ players[pid].unoCalled = true; }
-  updateTurnInfo(); renderPlayerHand(); renderPlayersTop(); renderPiles();
+  waitingColorChoice = null;
+  updateTurnUI();
 }
 
-/* -------------------------
-   Player Draw action (button)
-   ------------------------- */
-drawBtn.addEventListener('click', ()=>{
-  if(currentPlayer !== 0) { updateStatus('Not your turn'); return; }
-  if(deck.length === 0) reshuffleDiscardIntoDeck();
-  if(deck.length === 0){ updateStatus('No cards left to draw'); return; }
-  const c = deck.pop();
-  players[0].hand.push(c);
-  animateDrawCardToHand(c);
-  playDraw();
-  renderPiles();
-  renderPlayerHand();
-  // If new card is playable, player may play it, else turn ends
-  const playable = canPlayCard(c);
-  if(!playable){
-    updateStatus('You drew a card and have no valid play — turn ends');
-    // advance turn
-    advanceTurn();
-    updateTurnInfo();
-    setTimeout(() => { aiTurnIfNeeded(); }, 800);
-  } else {
-    updateStatus('You drew a playable card — you may play it');
+/* ------------------------------
+   UNO penalty: others can penalize one who forgot
+   ------------------------------ */
+function checkUnoPenalty(byPlayer){
+  // penalize any other player with 1 card who hasn't called UNO before byPlayer acted
+  for(let i=0;i<players.length;i++){
+    if(i===byPlayer) continue;
+    if(players[i].hand.length === 1 && !players[i].unoCalled){
+      // apply penalty
+      drawCards(i, 2);
+      log(`${players[i].name} forgot UNO and draws 2`);
+      sfxDraw();
+      players[i].unoCalled = false; // reset
+    }
   }
-});
+}
 
-/* -------------------------
-   UNO button
-   ------------------------- */
-unoBtn.addEventListener('click', ()=>{
-  if(players[0].hand.length === 1){
-    players[0].unoCalled = true;
-    playUnoCall();
-    updateStatus('You called UNO!');
-    log('You called UNO!');
-  } else {
-    // pressing UNO when not 1 card -> penalty?
-    updateStatus('You can only call UNO when you have 1 card');
-  }
-});
-
-/* -------------------------
-   AI logic
-   ------------------------- */
-function aiTurnIfNeeded(){
-  if(stateEnded()) return;
-  if(currentPlayer === 0) return;
-  const pid = currentPlayer;
-  const p = players[pid];
-  // small delay for AI to "think"
-  setTimeout(() => {
+/* ------------------------------
+   AI behavior - realistic delay 1.0-1.5s
+   ------------------------------ */
+function aiThinkAndAct(){
+  if(current === 0 || players[current].isAI === false) return;
+  if(busy) return;
+  busy = true;
+  const pid = current;
+  const delay = 1000 + Math.random()*500; // realistic 1.0 - 1.5s
+  setTimeout(()=>{
+    const hand = players[pid].hand;
     // find playable cards
     const playable = [];
-    for(let i=0;i<p.hand.length;i++){
-      if(aiCanPlayCard(pid, p.hand[i])) playable.push({idx:i, card:p.hand[i]});
+    for(let i=0;i<hand.length;i++){
+      if(canPlayCard(hand[i], pid)) playable.push(i);
     }
     if(playable.length === 0){
-      // draw one card
-      if(deck.length === 0) reshuffleDiscardIntoDeck();
+      // draw one
+      reshuffleIfNeeded();
       if(deck.length > 0){
         const c = deck.pop();
-        p.hand.push(c);
-        playDraw();
-        log(`${p.name} drew a card`);
-        // if playable, 50% chance to play immediately
-        const justPlayable = aiCanPlayCard(pid, c);
-        if(justPlayable && Math.random() < 0.9){
+        hand.push(c);
+        sfxDraw();
+        log(`${players[pid].name} drew a card`);
+        // if playable, 70% chance to play immediately
+        if(canPlayCard(c, pid) && Math.random() < 0.7){
           // play it
-          const idx = p.hand.length -1;
-          aiPlayCard(pid, idx);
+          const idx = hand.indexOf(c);
+          // play
+          playCard(pid, idx);
+          busy = false;
+          // after play, if next is AI, continue chain
+          setTimeout(()=>{ if(players[current] && players[current].isAI) aiThinkAndAct(); }, 600);
           return;
         }
       }
       // end turn
-      advanceTurn();
-      updateTurnInfo();
-      renderPlayersTop();
-      renderPiles();
-      // next AI or player
-      setTimeout(() => { aiTurnIfNeeded(); }, 600);
-    } else {
-      // choose card with preference: color match -> value match -> wild -> wild4 (only if legal)
-      // score them
-      playable.sort((a,b)=>{
-        const as = scoreCardForAI(a.card), bs = scoreCardForAI(b.card);
-        return bs - as;
-      });
-      const choice = playable[0];
-      aiPlayCard(pid, choice.idx);
+      current = getNext(current);
+      updateTurnUI();
+      busy = false;
+      setTimeout(()=>{ if(players[current] && players[current].isAI) aiThinkAndAct(); }, 700);
+      return;
     }
-  }, 700 + Math.random()*700);
-}
-
-function scoreCardForAI(card){
-  // prefer color match first (value 5), then number/symbol match (3), then wild(2), wild4(1)
-  let score = 0;
-  if(card.color !== 'wild' && card.color === topColor) score += 5;
-  if(card.value === topValue) score += 3;
-  if(card.color === 'wild' && card.value === 'wild') score += 2;
-  if(card.color === 'wild' && card.value === 'wild4') score += 1;
-  // prefer action cards if opponent has few cards
-  const opponents = players.filter((_,i)=>i!==currentPlayer);
-  const nearestOpp = opponents.reduce((a,b)=> (a.hand.length < b.hand.length ? a : b));
-  if(nearestOpp.hand.length <= 2 && ['skip','reverse','draw2','wild4'].includes(card.value)) score += 3;
-  return score;
-}
-
-function aiPlayCard(pid, cardIndex){
-  const p = players[pid];
-  const card = p.hand[cardIndex];
-  // for wilds, pick random color
-  if(card.color === 'wild'){
-    // check legality for wild4
-    if(card.value === 'wild4'){
-      const hasColorMatch = p.hand.some((h,idx) => h.color === topColor && h.color !== 'wild' && idx !== cardIndex);
-      if(hasColorMatch){ 
-        // can't play it; fallback: play other wild or other card; if impossible, draw
-        // try to find another playable
-        for(let i=0;i<p.hand.length;i++){
-          if(i===cardIndex) continue;
-          if(aiCanPlayCard(pid, p.hand[i])) { aiPlayCard(pid,i); return; }
+    // pick best card: prefer color match, then value match, then action if opportunistic, then wild, then wild4
+    let bestIndex = playable[0];
+    let bestScore = -999;
+    for(const idx of playable){
+      const c = hand[idx];
+      let score = 0;
+      if(c.color !== 'wild' && c.color === topColor) score += 5;
+      if(c.value === topValue) score += 3;
+      if(['skip','reverse','draw2','wild4'].includes(c.value)) score += 2;
+      if(c.color === 'wild' && c.value === 'wild') score += 1;
+      if(c.color === 'wild' && c.value === 'wild4') score += 0.5;
+      // if opponent low on cards, value actions more
+      const weakestOpp = players.reduce((acc,p,idx)=> (idx !== pid && p.hand.length < acc.hand.length ? {hand:p.hand.length, idx} : acc), {hand:999, idx:-1});
+      if(weakestOpp.hand <= 2 && ['draw2','wild4','skip','reverse'].includes(c.value)) score += 3;
+      if(score > bestScore){ bestScore = score; bestIndex = idx; }
+    }
+    // special: if picked wild/wild4, choose color strategically
+    const chosen = hand[bestIndex];
+    if(chosen.color === 'wild'){
+      // ensure wild4 legality
+      if(chosen.value === 'wild4'){
+        const hasColorMatch = hand.some((h, i)=> i!==bestIndex && h.color === topColor && h.color !== 'wild');
+        if(hasColorMatch){
+          // fallback to another playable if exists
+          let fallback = playable.find(i => hand[i].color !== 'wild');
+          if(typeof fallback === 'undefined') fallback = playable.find(i => hand[i].value !== 'wild4' || hand[i].color !== 'wild');
+          if(typeof fallback !== 'undefined') bestIndex = fallback;
         }
-        // else draw
-        if(deck.length>0){ const c = deck.pop(); p.hand.push(c); log(`${p.name} drew a card`); }
-        advanceTurn(); updateTurnInfo(); renderPlayersTop(); renderPiles(); return;
       }
     }
-    // choose random color weighted by what's in AI's hand
-    const counts = {red:0,yellow:0,green:0,blue:0};
-    for(const h of p.hand) if(h.color && h.color!=='wild') counts[h.color]++;
-    let chosen = 'red';
-    let best = -1;
-    for(const k of ['red','yellow','green','blue']) if(counts[k] > best){ best = counts[k]; chosen = k; }
-    // if tied, random
-    if(best === 0) chosen = ['red','yellow','green','blue'][Math.floor(Math.random()*4)];
-    // set chosen color on card and play
-    const played = p.hand.splice(cardIndex,1)[0];
-    played.chosenColor = chosen;
-    discard.push(played);
-    updateTopDiscard();
-    playCardPlay();
-    log(`${p.name} played ${played.value.toUpperCase()} and chose ${chosen.toUpperCase()}`);
-    if(played.value === 'wild') {
-      topColor = chosen;
-      advanceTurn();
-    } else if(played.value === 'wild4'){
-      topColor = chosen;
-      const next = getNextIndex(pid);
-      drawCardsForPlayer(next,4);
-      advanceTurn(); advanceTurn();
-    }
-    // UNO logic
-    if(p.hand.length === 1){ p.unoCalled = true; log(`${p.name} called UNO!`); }
-    // victory check
-    if(p.hand.length === 0){
-      playVictory();
-      updateStatus(`${p.name} wins!`);
-      disableInteraction();
+    // now play selected card
+    // For wilds we need to set chosenColor first - simulate choice
+    if(hand[bestIndex].color === 'wild'){
+      // choose most common color in AI hand
+      const counts = {red:0,yellow:0,green:0,blue:0};
+      for(const h of hand) if(h.color && h.color !== 'wild') counts[h.color]++;
+      let pick = 'red'; let maxc = -1;
+      for(const c of ['red','yellow','green','blue']) if(counts[c] > maxc){ maxc = counts[c]; pick = c; }
+      setTimeout(()=>{ chooseColorForAI(pid, bestIndex, pick); }, 220);
+      busy = false;
       return;
     }
-    renderPlayersTop(); renderPiles(); updateTurnInfo();
-  } else {
-    // normal colored card: validate (should be valid)
-    if(!aiCanPlayCard(pid, card)){ /* fallback */ }
-    const played = p.hand.splice(cardIndex,1)[0];
-    discard.push(played);
-    updateTopDiscard();
-    playCardPlay();
-    log(`${p.name} played ${cardText(played)}`);
-    applyCardEffect(pid, played);
-    // UNO
-    if(p.hand.length === 1){ p.unoCalled = true; log(`${p.name} called UNO!`); }
-    if(p.hand.length === 0){
-      playVictory();
-      updateStatus(`${p.name} wins!`);
-      disableInteraction();
-      return;
-    }
-    renderPlayersTop(); renderPiles(); renderPlayerHand();
-    updateTurnInfo();
-  }
+    // normal play
+    playCard(pid, bestIndex);
+    busy = false;
+    // continue chain if next also AI
+    setTimeout(()=>{ if(players[current] && players[current].isAI) aiThinkAndAct(); }, 800);
+  }, delay);
 }
 
-/* -------------------------
-   Rendering helpers
-   ------------------------- */
-function renderPiles(){
-  // draw count on deck
-  const back = document.querySelector('#drawPile .cardBack');
-  back.textContent = deck.length;
-  updateTopDiscard();
+function chooseColorForAI(pid, cardIndex, color){
+  const card = players[pid].hand[cardIndex];
+  // remove and place in discard, set chosenColor
+  const [played] = players[pid].hand.splice(cardIndex,1);
+  played.chosenColor = color;
+  discard.push(played);
+  renderAll();
+  sfxPlay();
+  log(`${players[pid].name} played ${played.value} and chose ${color.toUpperCase()}`);
+  // apply effects
+  if(played.value === 'wild'){
+    topColor = color;
+    topValue = 'wild';
+    current = getNext(pid);
+  } else if(played.value === 'wild4'){
+    topColor = color;
+    topValue = 'wild4';
+    const nxt = getNext(pid);
+    drawCards(nxt, 4);
+    log(`${players[nxt].name} draws 4`);
+    current = getNext(nxt);
+  }
+  // UNO for AI if needed
+  if(players[pid].hand.length === 1){ players[pid].unoCalled = true; sfxUno(); }
+  renderAll();
+  setTimeout(()=>{ if(players[current] && players[current].isAI) aiThinkAndAct(); else updateTurnUI(); }, 700);
 }
+
+/* ------------------------------
+   Player UI: render hands & AI slots
+   ------------------------------ */
 function renderPlayerHand(){
-  // clear and render bottom player hand
-  playerHandEl.innerHTML = '';
+  playerHandWrap.innerHTML = '';
   const hand = players[0].hand;
-  // highlight playable card(s)
   for(let i=0;i<hand.length;i++){
     const c = hand[i];
-    const el = document.createElement('div');
-    el.className = 'handCard ' + (c.color==='wild' ? 'face-wild' : (c.color==='red'?'face-red':(c.color==='yellow'?'face-yellow':(c.color==='green'?'face-green':'face-blue'))));
-    el.innerHTML = `<div style="font-size:18px">${c.value==='skip'?'⏭':(c.value==='reverse'?'⤾':(c.value==='draw2'?'+2':(c.value==='wild'?'★':(c.value==='wild4'?'+4':c.value))))}</div>`;
-    // highlight if playable
-    if(canPlayCard(c)) { el.style.boxShadow = '0 18px 36px rgba(0,0,0,0.6), 0 0 0 4px rgba(125,211,252,0.06)'; el.style.transform='translateY(-6px)'; }
-    el.addEventListener('click', ()=>{ 
-      // play attempt
-      if(canPlayCard(c)){
-        // locate exact index again - in case changed
-        const idx = players[0].hand.indexOf(c);
-        playCard(0, idx);
-        // if not waiting for color, and turn moved to AI, trigger AI
-        renderPlayerHand();
-        renderPlayersTop();
-        renderPiles();
-        updateTurnInfo();
-        if(currentPlayer !== 0) setTimeout(()=>aiTurnIfNeeded(), 600);
-      } else {
-        updateStatus('Cannot play that card');
-      }
+    const div = document.createElement('div');
+    div.className = 'handCard ' + cardClass(c);
+    div.innerHTML = `<div class="cardSymbol">${cardDisplay(c)}</div><div class="cardSub">${c.color==='wild' ? (c.value==='wild4'?'+4':'WILD') : ''}</div>`;
+    div.style.pointerEvents = (current === 0 && !busy) ? 'auto' : 'none';
+    // clickable if playable and player's turn
+    div.addEventListener('click', ()=>{
+      if(busy) return;
+      if(current !== 0){ setStatus('Not your turn'); return; }
+      if(!canPlayCard(c, 0)){ setStatus('Cannot play this card'); return; }
+      // play via index
+      const idx = players[0].hand.indexOf(c);
+      playCard(0, idx);
+      // if next is AI, trigger
+      setTimeout(()=>{ if(players[current] && players[current].isAI) aiThinkAndAct(); updateTurnUI(); }, 700);
     });
-    playerHandEl.appendChild(el);
+    playerHandWrap.appendChild(div);
   }
 }
 
-function renderPlayersTop(){
+function renderAITop(){
   playersTopEl.innerHTML = '';
   for(let i=1;i<players.length;i++){
     const p = players[i];
-    const cont = document.createElement('div');
-    cont.className = 'aiHand';
-    cont.style.flexDirection = 'column';
-    const label = document.createElement('div');
-    label.className = 'small'; label.textContent = `${p.name} (${p.hand.length})`;
-    const row = document.createElement('div'); row.style.display='flex'; row.style.gap='6px';
-    // show face-down cards as small
-    for(let j=0;j<Math.min(p.hand.length,10);j++){
-      const card = document.createElement('div'); card.className='aiCard';
-      row.appendChild(card);
+    const slot = document.createElement('div');
+    slot.className = 'aiSlot';
+    slot.style.width = '160px';
+    const row = document.createElement('div'); row.className = 'aiCards';
+    // show up to 8 cards face-down
+    const show = Math.min(8, p.hand.length);
+    for(let k=0;k<show;k++){
+      const card = document.createElement('div'); card.className = 'aiCard'; row.appendChild(card);
     }
-    cont.appendChild(row); cont.appendChild(label);
-    playersTopEl.appendChild(cont);
+    const label = document.createElement('div'); label.className='mini'; label.innerText = `${p.name} (${p.hand.length})`;
+    slot.appendChild(row); slot.appendChild(label);
+    playersTopEl.appendChild(slot);
   }
 }
 
-/* -------------------------
-   Animations
-   ------------------------- */
-function animateDrawCardToHand(card){
-  // simple brief flash to indicate draw (no DOM card fly for brevity)
-  playDraw();
-}
-
-/* -------------------------
-   Turn & status updates
-   ------------------------- */
-function updateTurnInfo(){
-  turnInfoEl.textContent = `Turn: ${players[currentPlayer].name}`;
-  statusEl.textContent = `Top: ${topColor ? topColor.toUpperCase() : ''} ${topValue ? topValue : ''}`;
-  // If it is AI's turn, trigger AI
-  if(currentPlayer !== 0){
-    setTimeout(()=>{ aiTurnIfNeeded(); }, 600);
-  }
-}
-
-function updateStatus(msg){
-  actionNoteEl.innerText = msg;
-  setTimeout(()=>{ if(actionNoteEl.innerText === msg) actionNoteEl.innerText = ''; }, 3000);
-  log(msg);
-}
-
-function disableInteraction(){
-  // disable draw/drawBtn/unobutton (simple: hide)
-  drawBtn.disabled = true; unoBtn.disabled = true; newGameBtn.disabled = false;
-}
-
-/* -------------------------
-   UNO penalty enforcement
-   ------------------------- */
-// When someone has 1 card but didn't call UNO (players[].unoCalled false) and another player plays before they call, they should be penalized (+2)
-function checkUnoPenaltyOnAction(byPlayerIndex){
-  // any other player with 1 card and unoCalled=false gets penalty
-  for(let i=0;i<players.length;i++){
-    if(i === byPlayerIndex) continue;
-    if(players[i].hand.length === 1 && !players[i].unoCalled){
-      // penalty
-      drawCardsForPlayer(i,2);
-      updateStatus(`${players[i].name} forgot UNO and draws 2!`);
-      log(`${players[i].name} forgot UNO and was penalized`);
-      // mark they still have 1+ cards (or more)
-      players[i].unoCalled = false;
+/* ------------------------------
+   Animation: play a card floating from player's hand to discard
+   ------------------------------ */
+function animatePlay(card, playerIndex){
+  // floating DOM element
+  const tmp = document.createElement('div');
+  tmp.className = 'playedFloating ' + cardClass(card);
+  tmp.innerHTML = `<div style="padding:8px;font-weight:900;font-size:22px">${cardDisplay(card)}</div>`;
+  document.body.appendChild(tmp);
+  // start position: if player -> bottom center near hand, if AI -> top slot
+  const boardRect = board.getBoundingClientRect();
+  let startX = boardRect.left + boardRect.width/2, startY = boardRect.top + boardRect.height/2;
+  if(playerIndex === 0){
+    const ph = playerHandWrap.getBoundingClientRect();
+    startX = ph.left + 50 + Math.random()*100 - ph.width/2;
+    startY = ph.top + 10;
+  } else {
+    // top slots
+    const aiSlots = document.querySelectorAll('.aiSlot');
+    const slot = aiSlots[playerIndex-1];
+    if(slot){
+      const r = slot.getBoundingClientRect();
+      startX = r.left + r.width/2;
+      startY = r.top + r.height/2;
+    } else {
+      startX = boardRect.left + (playerIndex * 40);
+      startY = boardRect.top + 40;
     }
   }
+  tmp.style.left = (startX - 44) + 'px';
+  tmp.style.top = (startY - 62) + 'px';
+  tmp.style.width = '88px'; tmp.style.height = '124px';
+  tmp.style.opacity = '1';
+  // destination: discard pile center
+  const dest = discardTopEl.getBoundingClientRect();
+  const destX = dest.left + dest.width/2 - 44;
+  const destY = dest.top + dest.height/2 - 62;
+  setTimeout(()=>{ tmp.style.transform = `translate(${destX - (startX - 44)}px, ${destY - (startY - 62)}px) scale(.95)`; tmp.style.opacity='0.98'; tmp.style.transition='transform .48s cubic-bezier(.17,.67,.32,1), opacity .4s ease'; }, 30);
+  setTimeout(()=>{ tmp.remove(); renderPiles(); }, 520);
 }
 
-/* -------------------------
-   Event Listeners for wild color pick
-   ------------------------- */
-pickRed.addEventListener('click', ()=>{ chooseColor('red'); });
-pickYellow.addEventListener('click', ()=>{ chooseColor('yellow'); });
-pickGreen.addEventListener('click', ()=>{ chooseColor('green'); });
-pickBlue.addEventListener('click', ()=>{ chooseColor('blue'); });
-
-/* -------------------------
-   Helpers: disable card play UI if not player's turn
-   ------------------------- */
-function stateEnded(){
-  // check if any player has 0 cards and game ended
-  return players.some(p=>p.hand && p.hand.length === 0);
+/* ------------------------------
+   Simple draw animation for human
+   ------------------------------ */
+function animateDraw(card){
+  // small flash effect - already handled in drawCards via sfx
+  // Could implement a flying card but for simplicity we do a subtle glow
+  const ph = playerHandWrap;
+  ph.style.transition = 'transform .2s ease';
+  ph.style.transform = 'translateY(-6px)';
+  setTimeout(()=> ph.style.transform = 'translateY(0)', 260);
 }
 
-/* -------------------------
-   Button wired new game
-   ------------------------- */
-newGameBtn.addEventListener('click', ()=>{
-  newGame();
+/* ------------------------------
+   Rendering all UI
+   ------------------------------ */
+function renderAll(){
+  renderAITop();
   renderPlayerHand();
-  renderPlayersTop();
   renderPiles();
-  updateTurnInfo();
+  setTurnBadge();
+}
+
+/* ------------------------------
+   Turn UI update: check current player and kick off AI if needed
+   ------------------------------ */
+function updateTurnUI(){
+  renderAll();
+  setTurnBadge();
+  // clear busy if not in animation
+  busy = false;
+  // if current player is AI -> call aiThinkAndAct
+  if(players[current].isAI){
+    setTimeout(()=>{ aiThinkAndAct(); }, 400);
+  }
+}
+
+/* ------------------------------
+   UNO button handling
+   ------------------------------ */
+unoBtn.addEventListener('click', ()=>{
+  if(players[0].hand.length === 1){
+    players[0].unoCalled = true;
+    sfxUno();
+    log('You called UNO!');
+    setStatus('You called UNO!');
+  } else {
+    setStatus('You can only call UNO when you have 1 card');
+  }
 });
 
-/* -------------------------
-   Initial state
-   ------------------------- */
+/* ------------------------------
+   Draw button handling (player)
+   ------------------------------ */
+drawBtn.addEventListener('click', ()=>{
+  if(current !== 0) { setStatus('Not your turn'); return; }
+  if(busy) return;
+  busy = true;
+  reshuffleIfNeeded();
+  if(deck.length === 0){ setStatus('No cards left'); busy=false; return; }
+  const c = deck.pop(); players[0].hand.push(c); sfxDraw(); animateDraw(c);
+  log('You drew a card');
+  renderAll();
+  // if playable, can play immediate; else end turn after 700ms
+  if(!canPlayCard(c, 0)){
+    setTimeout(()=>{ current = getNext(current); updateTurnUI(); busy=false; }, 700);
+  } else {
+    setStatus('You drew a playable card — you may play it');
+    busy = false;
+  }
+});
+
+/* ------------------------------
+   Show victory and disable UI
+   ------------------------------ */
+function showVictory(name){
+  victoryOverlay.classList.remove('hidden');
+  victoryOverlay.innerHTML = `<div style="font-size:24px;margin-bottom:8px">${name} Wins!</div><div style="margin-top:8px"><button id="restartBtn">Restart</button></div>`;
+  document.getElementById('restartBtn').addEventListener('click', ()=>{
+    victoryOverlay.classList.add('hidden');
+    startGame();
+  });
+  setStatus(`${name} wins!`);
+  // disable player input
+  busy = true;
+}
+
+/* ------------------------------
+   New round & start buttons
+   ------------------------------ */
+startBtn.addEventListener('click', ()=>{
+  startGame();
+});
+newBtn.addEventListener('click', ()=>{
+  startGame();
+});
+
+/* ------------------------------
+   Utils: cardText (for logs)
+   ------------------------------ */
+function cardText(card){
+  if(!card) return '';
+  if(card.value === 'skip') return `${card.color} SKIP`;
+  if(card.value === 'reverse') return `${card.color} REVERSE`;
+  if(card.value === 'draw2') return `${card.color} +2`;
+  if(card.value === 'wild') return 'WILD';
+  if(card.value === 'wild4') return 'WILD +4';
+  return `${card.color} ${card.value}`;
+}
+
+/* ------------------------------
+   Initial small hint & placeholder deck/draw
+   ------------------------------ */
 (function init(){
-  // set up initial rending and disable draw/uno until start
-  drawBtn.disabled = false; unoBtn.disabled = false;
-  // initial empty piles
-  deck = []; discard = [];
-  updateTopDiscard();
-  renderPiles();
-  updateStatus('Ready. Choose AI count and press New Game.');
+  setStatus('Choose AI count and press Start. Click board to enable sounds.');
+  // placeholder deck count
+  document.querySelector('#drawPile .cardBack').innerText = '0';
+  discardTopEl.innerText = '';
+  // allow board click to resume audio context
+  board.addEventListener('click', ()=>{ ensureAudio(); setStatus('Audio enabled'); }, {once:true});
 })();
 
 </script>
