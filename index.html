@@ -3,1113 +3,891 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Empire Forge — Islands RTS Prototype</title>
+<title>UNO Deluxe — Play vs AI (Single-file)</title>
 <style>
   :root{
-    --bg:#071021; --panel:#0f1724; --accent:#7dd3fc; --muted:#94a3b8;
-    --player:#6ee7b7; --ai:#fb7185; --neutral:#fbbf24;
+    --bg:#0b1220; --panel:#071827; --muted:#9fb0c8;
+    --red:#ef4444; --yellow:#f59e0b; --green:#10b981; --blue:#3b82f6; --black:#111827;
+    --card-w:72px; --card-h:100px;
   }
-  html,body{margin:0;height:100%;background:var(--bg);color:#e6eef8;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;}
-  .app{display:grid;grid-template-columns:1fr 360px;gap:12px;height:100vh;padding:12px}
-  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:10px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.6);position:relative}
-  canvas{width:100%; height:calc(100vh - 36px); display:block; background:#022631; border-radius:8px}
-  .side{display:flex;flex-direction:column;gap:10px}
-  .title{font-weight:700;font-size:18px}
-  .resources{display:flex;gap:6px;flex-wrap:wrap}
-  .res{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:8px;font-size:13px}
-  .controls{display:flex;gap:8px;flex-wrap:wrap}
-  button{background:#062635;border:1px solid rgba(255,255,255,0.03);color:var(--accent);padding:8px 10px;border-radius:8px;cursor:pointer}
-  select,input{padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:#dbeafe}
+  *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e6eef8}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071122,#021826)}
+  .wrap{max-width:1200px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 320px;gap:12px}
+  .board{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:14px;border-radius:12px;min-height:78vh;position:relative}
+  .panel{background:rgba(2,6,12,0.5);padding:12px;border-radius:10px}
+  .controls{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  button{background:#0f1724;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
+  .bright{color:var(--muted)}
+  .topArea{display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:12px}
+  #piles{display:flex;gap:18px;align-items:center;justify-content:center;margin-top:18px}
+  .pile{width:var(--card-w);height:var(--card-h);border-radius:8px;box-shadow:0 8px 24px rgba(2,6,12,0.6);display:flex;align-items:center;justify-content:center;position:relative;overflow:visible}
+  .cardBack{width:100%;height:100%;border-radius:8px;background:linear-gradient(180deg,#072b3c,#041b26);display:flex;align-items:center;justify-content:center;color:#bfe7f8;font-weight:700}
+  #discard{display:flex;align-items:center;justify-content:center}
+  #discard .cardFace{width:100%;height:100%;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#021018;box-shadow:inset 0 -8px 24px rgba(0,0,0,0.08)}
+  #playersTop{display:flex;gap:12px;justify-content:center;align-items:end;margin-bottom:12px}
+  .aiHand{display:flex;gap:6px;align-items:end}
+  .aiCard{width:28px;height:42px;border-radius:6px;background:#041827;border:1px solid rgba(255,255,255,0.03);box-shadow:0 2px 8px rgba(0,0,0,0.6)}
+  #log{height:260px;overflow:auto;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;margin-top:8px}
+  #playerHand{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;display:flex;gap:10px;align-items:flex-end;padding:8px;background:transparent}
+  .handCard{width:var(--card-w);height:var(--card-h);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#021018;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease}
+  .handCard:hover{transform:translateY(-8px);box-shadow:0 18px 36px rgba(2,6,12,0.6)}
   .small{font-size:13px;color:var(--muted)}
-  .log{height:260px;overflow:auto;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;font-size:13px}
-  .hud{position:absolute;left:12px;top:12px;background:rgba(0,0,0,0.4);padding:8px;border-radius:8px;font-size:13px}
-  .selectedBox{position:absolute;right:12px;top:12px;background:rgba(0,0,0,0.4);padding:8px;border-radius:8px;font-size:13px;min-width:180px}
-  .mini{font-size:12px;color:var(--muted)}
-  .bar{height:8px;background:#04161d;border-radius:6px;overflow:hidden}
-  .hp{height:100%;background:#86efac}
-  @media(max-width:1000px){.app{grid-template-columns:1fr; grid-auto-rows: auto} canvas{height:60vh}}
+  .big{font-size:18px;font-weight:700}
+  .colorLabel{display:inline-block;width:18px;height:18px;border-radius:4px;margin-right:6px;vertical-align:middle}
+  #wildColorPicker{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(3,6,9,0.94);padding:12px;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6)}
+  .colorBtn{width:44px;height:44px;border-radius:8px;cursor:pointer;border:2px solid rgba(0,0,0,0.2)}
+  .hud{position:absolute;left:16px;top:16px;background:rgba(0,0,0,0.35);padding:8px;border-radius:8px}
+  .centerHUD{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(0,0,0,0.35);padding:8px;border-radius:8px}
+  .actionNote{position:absolute;right:16px;top:16px;background:rgba(0,0,0,0.35);padding:8px;border-radius:8px}
+  .tiny{font-size:12px;color:var(--muted)}
+  @media(max-width:900px){
+    .wrap{grid-template-columns:1fr; padding:6px}
+    #playerHand{position:fixed;left:8px;transform:none;bottom:8px}
+  }
+  /* card face styles */
+  .face-red{background:linear-gradient(180deg,#ff6b6b,#ef4444);color:white}
+  .face-yellow{background:linear-gradient(180deg,#ffd86b,#f59e0b);color:#111}
+  .face-green{background:linear-gradient(180deg,#6ee7b7,#10b981);color:#021018}
+  .face-blue{background:linear-gradient(180deg,#93c5fd,#3b82f6);color:#021018}
+  .face-wild{background:linear-gradient(180deg,#333333,#111827);color:white}
+  .cardSym{font-size:22px; font-weight:900}
+  .playedAnim{animation: playedIn .28s ease;}
+  @keyframes playedIn { from { transform: translateY(20px) scale(0.9); opacity:0 } to { transform:translateY(0) scale(1); opacity:1 } }
+  .fadeOut{animation:fadeOut .45s ease forwards}
+  @keyframes fadeOut { to { opacity:0; transform: translateY(-10px) } }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="panel">
-    <div class="hud small" id="topInfo">Turn 1 • Phase: Player</div>
-    <canvas id="gameCanvas"></canvas>
-    <div class="selectedBox" id="selBox">Selected: None</div>
-  </div>
+<div class="wrap">
+  <div class="board panel" id="board">
+    <div class="hud small" id="status">Welcome to UNO — choose players and press New Game</div>
+    <div class="centerHUD small" id="turnInfo">Turn: -</div>
+    <div class="actionNote small" id="actionNote"></div>
 
-  <aside class="panel side">
-    <div>
-      <div class="title">Empire Forge</div>
-      <div class="small">Capture cities and villages, load troops into transports, and conquer the islands. Save & publish on GitHub Pages.</div>
+    <div id="playersTop" class="small"></div>
+
+    <div id="piles">
+      <div class="pile" id="drawPile" title="Draw Pile"><div class="cardBack small">Deck</div></div>
+      <div class="pile" id="discard" title="Discard Pile"><div id="topDiscard" class="cardFace"></div></div>
     </div>
 
-    <div class="resources" id="resourceDisplay"></div>
-
-    <div class="controls">
-      <button id="newGameBtn">New Game</button>
-      <button id="endTurnBtn">End Turn</button>
-      <button id="saveBtn">Save</button>
-      <button id="loadBtn">Load</button>
-    </div>
-
-    <div style="display:flex;gap:8px;align-items:center;">
-      <select id="trainSelect">
-        <option value="infantry">Infantry</option>
-        <option value="tank">Tank</option>
-        <option value="artillery">Artillery</option>
-        <option value="fighter">Fighter</option>
-        <option value="bomber">Bomber</option>
-        <option value="frigate">Frigate</option>
-        <option value="battleship">Battleship</option>
-        <option value="sub">Submarine</option>
-        <option value="transport">Transport</option>
-      </select>
-      <button id="trainBtn">Train (selected city)</button>
-      <button id="upgradeBtn">Upgrade City</button>
-    </div>
-
-    <div>
-      <div class="small">Controls</div>
-      <div class="small mini">
-        - Left-click to select unit / city / village.<br>
-        - Right-click to move / attack / load / unload.<br>
-        - Transport: right-click a friendly transport to load when adjacent, then right-click a coastal tile to unload.<br>
-        - Train units in owned cities, upgrade to increase production.<br>
+    <div id="wildColorPicker">
+      <div class="small" style="margin-bottom:8px">Pick a color</div>
+      <div style="display:flex;gap:8px">
+        <div class="colorBtn" id="pickRed" style="background:var(--red)"></div>
+        <div class="colorBtn" id="pickYellow" style="background:var(--yellow)"></div>
+        <div class="colorBtn" id="pickGreen" style="background:var(--green)"></div>
+        <div class="colorBtn" id="pickBlue" style="background:var(--blue)"></div>
       </div>
     </div>
+  </div>
 
-    <div>
-      <div class="small">Game Log</div>
-      <div id="log" class="log"></div>
+  <div class="panel">
+    <div class="controls">
+      <label class="small">AI Opponents:</label>
+      <select id="aiCount"><option value="2">2 AI (3 players)</option><option value="3">3 AI (4 players)</option></select>
+      <button id="newGameBtn">New Game</button>
+      <button id="drawBtn">Draw Card</button>
+      <button id="unoBtn">Call UNO</button>
     </div>
 
-    <div class="small">Tip: use transports to cross water. Villages provide small resource bonuses and can be captured quickly.</div>
-  </aside>
+    <div class="small" style="margin-bottom:6px">Game Messages</div>
+    <div id="log" class="small"></div>
+    <div style="margin-top:8px" class="small">Controls: Click your card to play (valid ones highlighted). Right now Wild Draw Four is disallowed if you have a matching color card.</div>
+    <div style="margin-top:12px" class="small">Sounds: enabled via Web Audio (no external files)</div>
+  </div>
 </div>
 
+<!-- Player hand container (fixed at bottom) -->
+<div id="playerHand"></div>
+
 <script>
-/*
-  Empire Forge — Single-file RTS prototype (turn-based mode)
-  - 50x50 tile map
-  - Terrain: plains, forest, mountain, water
-  - Resources: gold, iron, wood, stone, food
-  - Cities: player, AI, neutral; villages: small neutral settlements
-  - Units including Transport that can carry land units
-  - Fog of war, A* pathfinding, AI that uses transports and coordinates invasions
-  - Save/load + New Game
+/* UNO Deluxe — Single-file
+   Features:
+   - Full UNO deck (108 cards)
+   - 2 or 3 AI opponents selectable
+   - Classic colors (red, yellow, green, blue, wild)
+   - Animations & WebAudio-based sound effects
+   - Wild color chooser popup
+   - UNO button & penalty
+   - Prevent Wild Draw 4 illegal plays
 */
 
-/* =========================
-   CONFIG
-   ========================= */
-const TILE_COUNT = 50;
-const TILE_SIZE = 12; // pixels per tile
-const CANVAS_SIZE = TILE_COUNT * TILE_SIZE;
-const FOG_ENABLED = true;
-const VIS_RADIUS_UNIT = 5; // visibility radius for regular units
-const VIS_RADIUS_CITY = 4;
-const TRANSPORT_CAPACITY = 4; // how many land units a transport can carry
-const CITY_CAPTURE_HOLD_TURNS = 3;
-const VILLAGE_CAPTURE_HOLD = 1;
+/* -------------------------
+   Utilities & Sound (Web Audio)
+   ------------------------- */
+const logEl = document.getElementById('log');
+function log(msg){ const t = document.createElement('div'); t.innerText = msg; logEl.prepend(t); }
 
-/* Colors */
-const COLOR = {
-  water:'#04314a', plains:'#2f8b57', forest:'#196636', mountain:'#565a61',
-  player:'#6ee7b7', ai:'#fb7185', neutral:'#fbbf24', village:'#f9a825'
-};
-
-/* Terrain info */
-const TERRAIN = {
-  water: {move:1, passableBy:['navy']},
-  plains: {move:1, passableBy:['land','air']},
-  forest: {move:1.5, passableBy:['land','air']},
-  mountain: {move:3, passableBy:['land','air'], resource:'iron'}
-};
-
-/* Resource list */
-const RESOURCE_KEYS = ['gold','iron','wood','stone','food'];
-
-/* Unit definitions */
-const UNIT_DEF = {
-  infantry:  {name:'Infantry', cat:'land',  hp:10, atk:4, def:2, speed:2, range:1, cost:{gold:30,food:5}, upkeep:{food:1}},
-  tank:      {name:'Tank',     cat:'land',  hp:20, atk:9, def:6, speed:2, range:1, cost:{gold:100,iron:10,food:3}, upkeep:{food:2}},
-  artillery: {name:'Artillery',cat:'land',  hp:12, atk:11,def:1, speed:1, range:3, cost:{gold:90,iron:6,food:2}, upkeep:{food:2}},
-  fighter:   {name:'Fighter',  cat:'air',   hp:14, atk:8, def:3, speed:4, range:3, cost:{gold:160,iron:6,food:4}, upkeep:{food:3}},
-  bomber:    {name:'Bomber',   cat:'air',   hp:20, atk:14,def:2, speed:3, range:3, cost:{gold:220,iron:10,food:6}, upkeep:{food:4}},
-  frigate:   {name:'Frigate',  cat:'navy',  hp:18, atk:7, def:4, speed:3, range:2, cost:{gold:120,iron:8,food:3}, upkeep:{food:2}},
-  battleship:{name:'Battleship',cat:'navy', hp:30, atk:14,def:9, speed:2, range:3, cost:{gold:320,iron:22,food:6}, upkeep:{food:5}},
-  sub:       {name:'Submarine',cat:'navy',  hp:16, atk:10,def:3, speed:3, range:1, cost:{gold:150,iron:8,food:3}, upkeep:{food:2}},
-  transport: {name:'Transport',cat:'navy',  hp:18, atk:0, def:3, speed:3, range:1, cost:{gold:140,wood:8,food:4}, upkeep:{food:2}, capacity:TRANSPORT_CAPACITY}
-};
-
-/* City base production per level */
-const CITY_BASE_PROD = {gold:6,iron:1,wood:2,stone:1,food:8};
-const CITY_UPGRADE_MULT = 1.9;
-
-/* =========================
-   STATE
-   ========================= */
-const canvas = document.getElementById('gameCanvas');
-canvas.width = CANVAS_SIZE;
-canvas.height = CANVAS_SIZE;
-const ctx = canvas.getContext('2d');
-
-let state = {
-  turn:1,
-  phase:'player', // 'player' | 'ai' | 'end'
-  map:[], // TILE_COUNT x TILE_COUNT
-  units:[], // list of units
-  cities:[], // both player and ai and neutral: {id,x,y,owner(level -1 neutral),level, captureProgress}
-  villages:[], // neutral small settlements
-  players:[
-    {id:0, name:'Player', color:COLOR.player, resources:{gold:180,iron:12,wood:12,stone:8,food:60}},
-    {id:1, name:'Rival',  color:COLOR.ai,     resources:{gold:140,iron:8,wood:10,stone:6,food:50}}
-  ],
-  selected: null, // {type:'unit'|'city'|'village', id:...}
-  log: []
-};
-
-/* =========================
-   HELPERS
-   ========================= */
-const rand = n => Math.floor(Math.random()*n);
-const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-const keyxy = (x,y)=>`${x},${y}`;
-
-function pushLog(s){
-  state.log.unshift({t:Date.now(), s});
-  const el = document.getElementById('log');
-  el.innerHTML = state.log.slice(0,200).map(it=>`<div style="padding:4px">${it.s}</div>`).join('');
+// WebAudio context & helper functions to produce nicer sounds
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioCtx();
+function playToneSequence(params){
+  // params: array of {freq, dur, type, volume}
+  const now = audioCtx.currentTime;
+  let time = now;
+  for(const p of params){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = p.type || 'sine';
+    osc.frequency.setValueAtTime(p.freq, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime((p.volume||0.08), time + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + p.dur - 0.02);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(time); osc.stop(time + p.dur);
+    time += p.dur;
+  }
 }
 
-/* =========================
-   MAP GENERATION
-   ========================= */
-function generateMap(){
-  // create empty
-  const map = Array.from({length:TILE_COUNT},()=>Array.from({length:TILE_COUNT},()=>({terrain:'plains', resource:null, city:null, owner:null})));
-  // island seeds
-  const seeds = [];
-  const islandCount = 8 + rand(6);
-  for(let i=0;i<islandCount;i++) seeds.push({x:rand(TILE_COUNT), y:rand(TILE_COUNT), r:6+rand(8), off: Math.random()*1000});
-  for(let y=0;y<TILE_COUNT;y++){
-    for(let x=0;x<TILE_COUNT;x++){
-      let v=0;
-      for(const s of seeds){
-        const dx=x-s.x, dy=y-s.y;
-        const d=Math.sqrt(dx*dx+dy*dy);
-        v += Math.max(0, (s.r + Math.sin((dx+dy+s.off)/5)*2) - d);
-      }
-      if(v < 3) map[y][x].terrain = 'water';
-      else {
-        const r=Math.random();
-        if(r<0.14) map[y][x].terrain='forest';
-        else if(r<0.2) map[y][x].terrain='mountain';
-        else map[y][x].terrain='plains';
-        // resources
-        if(map[y][x].terrain==='forest' && Math.random()<0.3) map[y][x].resource='wood';
-        if(map[y][x].terrain==='mountain' && Math.random()<0.28) map[y][x].resource='iron';
-        if(map[y][x].terrain==='plains' && Math.random()<0.04) map[y][x].resource='gold';
-        if(Math.random()<0.03 && map[y][x].terrain!=='water') map[y][x].resource='stone';
-      }
+// richer effects
+function playShuffle(){
+  // multiple descending noise-like blips
+  const seq = [
+    {freq:1200, dur:0.06, type:'sawtooth', volume:0.06},
+    {freq:900, dur:0.08, type:'sawtooth', volume:0.06},
+    {freq:700, dur:0.09, type:'sine', volume:0.05},
+    {freq:500, dur:0.12, type:'sine', volume:0.05}
+  ];
+  playToneSequence(seq);
+}
+function playCardPlay(){
+  playToneSequence([{freq:880,dur:0.09,type:'triangle',volume:0.06},{freq:1320,dur:0.06,type:'sine',volume:0.04}]);
+}
+function playDraw(){
+  playToneSequence([{freq:520,dur:0.07,type:'sine',volume:0.06},{freq:680,dur:0.06,type:'sine',volume:0.04}]);
+}
+function playSkip(){
+  playToneSequence([{freq:420,dur:0.08,type:'square',volume:0.06},{freq:320,dur:0.05,type:'square',volume:0.05}]);
+}
+function playReverse(){
+  playToneSequence([{freq:720,dur:0.09,type:'triangle',volume:0.06},{freq:880,dur:0.08,type:'triangle',volume:0.05}]);
+}
+function playUnoCall(){
+  playToneSequence([{freq:1000,dur:0.18,type:'sine',volume:0.09},{freq:1200,dur:0.12,type:'sine',volume:0.07}]);
+}
+function playVictory(){
+  playToneSequence([{freq:880,dur:0.12,type:'triangle',volume:0.09},{freq:1100,dur:0.10,type:'triangle',volume:0.08},{freq:1320,dur:0.14,type:'sawtooth',volume:0.1}]);
+}
+
+/* -------------------------
+   Representing cards & deck
+   ------------------------- */
+/*
+ Card object: {color: 'red'|'yellow'|'green'|'blue'|'wild', value: '0'..'9' | 'skip' | 'reverse' | 'draw2' | 'wild' | 'wild4'}
+*/
+function createFullDeck(){
+  const colors = ['red','yellow','green','blue'];
+  const deck = [];
+  // Number cards: one 0 per color, two of 1-9 per color
+  for(const c of colors){
+    deck.push({color:c, value:'0'});
+    for(let n=1;n<=9;n++){
+      deck.push({color:c, value: String(n)});
+      deck.push({color:c, value: String(n)});
+    }
+    // Action cards: two of each per color
+    for(let i=0;i<2;i++){
+      deck.push({color:c, value:'skip'});
+      deck.push({color:c, value:'reverse'});
+      deck.push({color:c, value:'draw2'});
     }
   }
-  return map;
+  // Wild cards: 4 wild, 4 wild draw four
+  for(let i=0;i<4;i++) deck.push({color:'wild', value:'wild'});
+  for(let i=0;i<4;i++) deck.push({color:'wild', value:'wild4'});
+  // total should be 108
+  return deck;
 }
-
-function findSpawn(map){
-  // find a land tile with no water immediately adjacent (prefer)
-  for(let tries=0; tries<5000; tries++){
-    const x=rand(TILE_COUNT), y=rand(TILE_COUNT);
-    if(map[y][x].terrain==='water') continue;
-    // ensure not too close to edge and has some land around
-    let waterAdj=0;
-    for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
-      const nx=x+dx, ny=y+dy;
-      if(nx<0||ny<0||nx>=TILE_COUNT||ny>=TILE_COUNT) waterAdj++;
-      else if(map[ny][nx].terrain==='water') waterAdj++;
-    }
-    if(waterAdj < 18) return {x,y};
+function shuffleDeck(deck){
+  // Fisher-Yates
+  for(let i=deck.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [deck[i],deck[j]] = [deck[j],deck[i]];
   }
-  // fallback
-  for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++) if(map[y][x].terrain!=='water') return {x,y};
-  return {x:0,y:0};
+  playShuffle();
+  return deck;
 }
 
-/* =========================
-   CITY & VILLAGE CREATION
-   ========================= */
-let nextCityId = 1;
-function createCity(x,y, owner){
-  const city = {id: nextCityId++, x,y, owner, level:1, captureProgress:0};
-  state.cities.push(city);
-  state.map[y][x].city = city;
-  return city;
+/* -------------------------
+   Game state
+   ------------------------- */
+let deck = []; // draw pile
+let discard = []; // discard pile (top is last)
+let players = []; // array of {name, hand:[], isAI:true/false, unoCalled:false}
+let currentPlayer = 0;
+let playDirection = 1; // 1 for clockwise, -1 for counterclockwise
+let topColor = null; // effective color for matching (when wild chosen)
+let topValue = null;
+let skipNext = false;
+let drawStack = 0; // stacking draw2/draw4? We'll implement standard: draw effects applied, not stacking
+let waitingColorPick = null; // when someone played wild/wild4 and needs to pick color
+let aiCountSelect = document.getElementById('aiCount');
+
+/* -------------------------
+   UI references
+   ------------------------- */
+const drawBtn = document.getElementById('drawBtn');
+const unoBtn = document.getElementById('unoBtn');
+const newGameBtn = document.getElementById('newGameBtn');
+const playerHandEl = document.getElementById('playerHand');
+const drawPileEl = document.getElementById('drawPile');
+const discardEl = document.getElementById('topDiscard');
+const playersTopEl = document.getElementById('playersTop');
+const statusEl = document.getElementById('status');
+const turnInfoEl = document.getElementById('turnInfo');
+const actionNoteEl = document.getElementById('actionNote');
+const wildPicker = document.getElementById('wildColorPicker');
+const pickRed = document.getElementById('pickRed');
+const pickYellow = document.getElementById('pickYellow');
+const pickGreen = document.getElementById('pickGreen');
+const pickBlue = document.getElementById('pickBlue');
+
+/* -------------------------
+   Helper functions
+   ------------------------- */
+function cardHTML(card){
+  if(!card) return '';
+  const cls = card.color==='wild' ? 'face-wild' : (card.color==='red'?'face-red':(card.color==='yellow'?'face-yellow':(card.color==='green'?'face-green':'face-blue')));
+  const display = (card.value==='skip' ? '⏭' : (card.value==='reverse'?'⤾':(card.value==='draw2'?'+2':(card.value==='wild'?'★':(card.value==='wild4'?'+4':card.value)))));
+  return `<div class="cardFace ${cls}"><div class="cardSym">${display}</div></div>`;
+}
+function updateTopDiscard(){
+  const top = discard[discard.length-1];
+  discardEl.innerHTML = cardHTML(top);
+  // update turn text color possibly
+  if(top){
+    topColor = (top.color==='wild' && top.chosenColor) ? top.chosenColor : top.color;
+    topValue = top.value;
+  } else { topColor = null; topValue = null; }
 }
 
-let nextVillageId = 1;
-function createVillage(x,y){
-  const v = {id: nextVillageId++, x,y, owner:null, captureProgress:0};
-  state.villages.push(v);
-  return v;
-}
-
-/* =========================
-   UNIT CREATION
-   ========================= */
-let nextUnitId = 1;
-function createUnit(type, owner, x, y){
-  const def = UNIT_DEF[type];
-  const u = {
-    id: nextUnitId++,
-    type, owner, x, y,
-    hp: def.hp, maxHp: def.hp, moves: def.speed, maxMoves:def.speed,
-    atk:def.atk, defStat:def.def, range:def.range, speed:def.speed,
-    cat:def.cat, upkeep:def.upkeep, loaded: [], // for transport: holds units' IDs
-    status:'idle', target:null
-  };
-  state.units.push(u);
-  return u;
-}
-
-/* =========================
-   INITIAL GAME SETUP
-   ========================= */
+/* -------------------------
+   Start New Game
+   ------------------------- */
 function newGame(){
-  state.turn = 1;
-  state.phase = 'player';
-  state.map = generateMap();
-  state.units = [];
-  state.cities = [];
-  state.villages = [];
-  state.selected = null;
-  state.log = [];
-  nextCityId = 1; nextUnitId = 1; nextVillageId = 1;
-
-  // place player & ai cities
-  const spawn0 = findSpawn(state.map);
-  const spawn1 = findSpawn(state.map);
-  createCity(spawn0.x, spawn0.y, 0);
-  createCity(spawn1.x, spawn1.y, 1);
-
-  // create some neutral cities and villages
-  const neutralCount = 6 + rand(6);
-  let tries=0;
-  while(neutralCount>0 && state.cities.filter(c=>c.owner===null).length < neutralCount && tries < 10000){
-    tries++;
-    const x=rand(TILE_COUNT), y=rand(TILE_COUNT);
-    if(state.map[y][x].terrain==='water') continue;
-    if(state.map[y][x].city) continue;
-    // spread them somewhat
-    if(Math.random() < 0.5) createCity(x,y,null);
+  // init
+  deck = shuffleDeck(createFullDeck());
+  discard = [];
+  players = [];
+  const aiCount = parseInt(aiCountSelect.value,10);
+  // human player at index 0
+  players.push({name:'You', hand:[], isAI:false, unoCalled:false});
+  for(let i=1;i<=aiCount;i++) players.push({name: 'AI ' + i, hand:[], isAI:true, unoCalled:false});
+  currentPlayer = 0; playDirection = 1; drawStack = 0; waitingColorPick = null;
+  // deal 7 each
+  for(let r=0;r<7;r++){
+    for(let p=0;p<players.length;p++){
+      players[p].hand.push(deck.pop());
+    }
   }
-  // villages
-  for(let i=0;i<18;i++){
-    const x=rand(TILE_COUNT), y=rand(TILE_COUNT);
-    if(state.map[y][x].terrain!=='water') createVillage(x,y);
+  // flip first non-wild card to start
+  let first = deck.pop();
+  while(first.value==='wild' || first.value==='wild4'){
+    deck.unshift(first); // put back deeper
+    shuffleDeck(deck); // shuffle again
+    first = deck.pop();
   }
-
-  // initial units for both players
-  const p0city = state.cities.find(c=>c.owner===0);
-  const p1city = state.cities.find(c=>c.owner===1);
-  createUnit('infantry', 0, p0city.x+1, p0city.y);
-  createUnit('frigate', 1, p1city.x+1, p1city.y);
-  createUnit('transport', 1, p1city.x+2, p1city.y);
-
-  state.players[0].resources = {gold:180,iron:12,wood:12,stone:8,food:60};
-  state.players[1].resources = {gold:140,iron:8,wood:10,stone:6,food:50};
-
-  pushLog('New game: islands generated. Capture neutral cities and villages.');
-  redraw();
-  updateUI();
+  discard.push(first);
+  updateTopDiscard();
+  // reset UNO call flags
+  players.forEach(p=>p.unoCalled=false);
+  // render UI
+  renderPlayersTop();
+  renderPlayerHand();
+  updateStatus('New game started');
+  log('Game started. Top card: ' + cardText(first));
+  // apply initial action if first card is action (skip/draw2/reverse)
+  if(first.value === 'skip'){
+    advanceTurn();
+    updateStatus('First card was Skip — first player skipped');
+  } else if(first.value === 'reverse'){
+    playDirection *= -1;
+    updateStatus('Play direction reversed by initial card');
+  } else if(first.value === 'draw2'){
+    // next player draws two and misses turn
+    const next = getNextIndex(currentPlayer);
+    drawCardsForPlayer(next, 2);
+    advanceTurn();
+    updateStatus('First card was Draw Two — next player drew 2 and skipped');
+  }
+  updateTopDiscard();
+  renderPlayersTop();
+  renderPlayerHand();
+  renderPiles();
+  updateTurnInfo();
 }
 
-/* =========================
-   RENDERING (pixel-art-ish)
-   ========================= */
-function drawTile(x,y){
-  const t = state.map[y][x].terrain;
-  const base = (t==='water') ? COLOR.water : (t==='plains' ? COLOR.plains : (t==='forest'? COLOR.forest : COLOR.mountain));
-  ctx.fillStyle = base;
-  ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-
-  // small pixel art details: trees, rocks, waves
-  if(t==='forest' && Math.random()<0.02){
-    // small darker pixel
-    ctx.fillStyle = '#0f3f22';
-    ctx.fillRect(x*TILE_SIZE + 2, y*TILE_SIZE + 2, 2,2);
-  }
-  if(t==='mountain' && Math.random()<0.012){
-    ctx.fillStyle = '#3a3d42';
-    ctx.fillRect(x*TILE_SIZE+3, y*TILE_SIZE+2, 3,3);
-  }
-  if(t==='water' && Math.random()<0.04){
-    ctx.fillStyle = 'rgba(255,255,255,0.03)';
-    ctx.fillRect(x*TILE_SIZE + Math.floor(TILE_SIZE/2), y*TILE_SIZE + Math.floor(TILE_SIZE/2), 2,1);
-  }
-
-  // resource dot
-  if(state.map[y][x].resource){
-    ctx.fillStyle = '#fef08a';
-    ctx.fillRect(x*TILE_SIZE + TILE_SIZE/2 - 2, y*TILE_SIZE + TILE_SIZE/2 - 2, 4,4);
-  }
+/* -------------------------
+   Utilities - indexing & rotation
+   ------------------------- */
+function getNextIndex(idx){
+  return (idx + playDirection + players.length) % players.length;
+}
+function advanceTurn(){
+  currentPlayer = getNextIndex(currentPlayer);
+  // reset UNO flags if needed
+  players.forEach(p=>{ if(p.hand.length !== 1) p.unoCalled = false; });
 }
 
-function redraw(){
-  // clear
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // draw tiles
-  for(let y=0;y<TILE_COUNT;y++){
-    for(let x=0;x<TILE_COUNT;x++){
-      drawTile(x,y);
+/* -------------------------
+   Actions: draw, play, apply effects
+   ------------------------- */
+function drawCardsForPlayer(pid, count){
+  for(let i=0;i<count;i++){
+    if(deck.length === 0) reshuffleDiscardIntoDeck();
+    if(deck.length === 0) { log('No cards left to draw'); break; }
+    const c = deck.pop();
+    players[pid].hand.push(c);
+    if(pid === 0){
+      animateDrawCardToHand(c);
     }
   }
+  playDraw();
+  renderPlayerHand();
+  renderPlayersTop();
+  renderPiles();
+}
 
-  // draw villages
-  for(const v of state.villages){
-    ctx.fillStyle = COLOR.village;
-    ctx.fillRect(v.x*TILE_SIZE+2, v.y*TILE_SIZE+2, TILE_SIZE-4, TILE_SIZE-4);
-    ctx.fillStyle = '#000'; ctx.font='8px monospace'; ctx.fillText('V', v.x*TILE_SIZE + TILE_SIZE/2 -2, v.y*TILE_SIZE + TILE_SIZE/2 -2);
+function reshuffleDiscardIntoDeck(){
+  if(discard.length <= 1) return;
+  const top = discard.pop();
+  deck = shuffleDeck(discard.splice(0, discard.length));
+  discard = [top];
+  updateTopDiscard();
+  log('Reshuffled discard into deck');
+}
+
+function canPlayCard(card){
+  if(!card) return false;
+  // wild/wild4 always playable by color matching rules? Wild is always playable; wild4 only if no card in hand matches topColor
+  if(card.color === 'wild'){
+    if(card.value === 'wild4'){
+      // check for illegal play: if player does have a card that matches current color, disallow wild4
+      const hand = players[0].hand;
+      const hasColorMatch = hand.some(h => h.color === topColor && h.color !== 'wild');
+      if(hasColorMatch) return false;
+      return true;
+    }
+    return true;
   }
+  // color match OR value match OR number/symbol match
+  if(topColor === card.color) return true;
+  if(topValue === card.value) return true;
+  return false;
+}
 
-  // draw cities
-  for(const c of state.cities){
-    const col = c.owner===0 ? state.players[0].color : (c.owner===1 ? state.players[1].color : COLOR.neutral);
-    ctx.fillStyle = col;
-    ctx.fillRect(c.x*TILE_SIZE+1, c.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
-    ctx.fillStyle = '#000';
-    ctx.font='9px monospace';
-    ctx.fillText('C'+c.level, c.x*TILE_SIZE+3, c.y*TILE_SIZE+8);
+function aiCanPlayAny(pid){
+  const hand = players[pid].hand;
+  for(const c of hand){
+    if(aiCanPlayCard(pid, c)) return true;
   }
+  return false;
+}
+function aiCanPlayCard(pid, card){
+  // for AI, allow wild4 only if no color-match in hand
+  if(card.color === 'wild' && card.value === 'wild4'){
+    const hand = players[pid].hand;
+    const hasColorMatch = hand.some(h => h.color === topColor && h.color !== 'wild');
+    if(hasColorMatch) return false;
+    return true;
+  }
+  if(card.color === 'wild') return true;
+  if(topColor === card.color) return true;
+  if(topValue === card.value) return true;
+  return false;
+}
 
-  // fog-of-war overlay (player only)
-  let visible = Array.from({length:TILE_COUNT}, ()=>Array(TILE_COUNT).fill(false));
-  if(FOG_ENABLED){
-    // mark visibility from player units & cities
-    for(const u of state.units.filter(u=>u.owner===0)){
-      const r = VIS_RADIUS_UNIT;
-      for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-        const nx=u.x+dx, ny=u.y+dy; if(nx>=0&&ny>=0&&nx<TILE_COUNT&&ny<TILE_COUNT) visible[ny][nx] = true;
+function cardText(card){
+  if(!card) return '';
+  if(card.value === 'skip') return `${card.color.toUpperCase()} Skip`;
+  if(card.value === 'reverse') return `${card.color.toUpperCase()} Reverse`;
+  if(card.value === 'draw2') return `${card.color.toUpperCase()} +2`;
+  if(card.value === 'wild') return `Wild`;
+  if(card.value === 'wild4') return `Wild +4`;
+  return `${card.color.toUpperCase()} ${card.value}`;
+}
+
+function playCard(pid, cardIndex){
+  const hand = players[pid].hand;
+  if(cardIndex < 0 || cardIndex >= hand.length) return false;
+  const card = hand[cardIndex];
+  // validation: player's turn?
+  if(pid !== currentPlayer) return false;
+  // if needs color pick (wild) show picker
+  if(card.color === 'wild'){
+    // for wild4 also check illegal play rule for human
+    if(card.value === 'wild4'){
+      // check if human/AI has matching color card in hand
+      const hasColorMatch = hand.some((h,idx) => h.color === topColor && h.color !== 'wild' && idx !== cardIndex);
+      if(hasColorMatch && pid === 0){
+        updateStatus('Illegal Wild Draw Four play — you have a matching color card.');
+        log('Illegal attempt: Wild Draw 4 when a color match exists.');
+        return false;
+      } else if(hasColorMatch && pid !== 0){
+        // AI shouldn't play it - disallow
+        return false;
       }
     }
-    for(const c of state.cities.filter(c=>c.owner===0)){
-      const r = VIS_RADIUS_CITY;
-      for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-        const nx=c.x+dx, ny=c.y+dy; if(nx>=0&&ny>=0&&nx<TILE_COUNT&&ny<TILE_COUNT) visible[ny][nx] = true;
-      }
-    }
-    // overlay dark
-    ctx.fillStyle = 'rgba(0,0,0,0.72)';
-    for(let y=0;y<TILE_COUNT;y++) for(let x=0;x<TILE_COUNT;x++) if(!visible[y][x]) ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE);
+    // wait for color pick
+    waitingColorPick = {pid, cardIndex};
+    showColorPicker();
+    return true;
   } else {
-    visible = Array.from({length:TILE_COUNT}, ()=>Array(TILE_COUNT).fill(true));
-  }
-
-  // draw units (draw after fog so they provide visibility)
-  for(const u of state.units){
-    // only draw if visible by player or owner is player or fog disabled
-    const canSee = !FOG_ENABLED || visible[u.y][u.x] || u.owner===0;
-    if(!canSee) continue;
-    const px = u.x*TILE_SIZE + TILE_SIZE/2;
-    const py = u.y*TILE_SIZE + TILE_SIZE/2;
-    // small pixel-art icon: circle with letter
-    ctx.beginPath();
-    ctx.arc(px, py, TILE_SIZE*0.38, 0, Math.PI*2);
-    ctx.fillStyle = state.players[u.owner].color;
-    ctx.fill();
-    ctx.fillStyle = '#021018'; ctx.font='10px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(u.type[0].toUpperCase(), px, py+1);
-
-    // hp bar
-    const w = TILE_SIZE*0.9, h = 4;
-    const ratio = Math.max(0, u.hp / u.maxHp);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 7, w, h);
-    ctx.fillStyle = '#86efac';
-    ctx.fillRect(u.x*TILE_SIZE + (TILE_SIZE-w)/2, u.y*TILE_SIZE + TILE_SIZE - 7, w*ratio, h);
-
-    // selection highlight
-    if(state.selected && state.selected.type==='unit' && state.selected.id===u.id){
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
-      ctx.strokeRect(u.x*TILE_SIZE+1, u.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
-    }
-    // show load count for transport
-    if(u.type==='transport'){
-      ctx.fillStyle = '#000'; ctx.font='8px monospace'; ctx.fillText('+' + u.loaded.length, px+8, py-8);
-    }
-  }
-
-  // selection highlight for city
-  if(state.selected && state.selected.type==='city'){
-    const c = state.cities.find(cc=>cc.id===state.selected.id);
-    if(c){
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
-      ctx.strokeRect(c.x*TILE_SIZE+1, c.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
-    }
-  }
-  // village selection
-  if(state.selected && state.selected.type==='village'){
-    const v = state.villages.find(vv=>vv.id===state.selected.id);
-    if(v){
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=2;
-      ctx.strokeRect(v.x*TILE_SIZE+1, v.y*TILE_SIZE+1, TILE_SIZE-2, TILE_SIZE-2);
-    }
-  }
-
-  // update top info and selected panel
-  document.getElementById('topInfo').textContent = `Turn ${state.turn} • Phase: ${state.phase.toUpperCase()}`;
-  updateSelectedBox();
-}
-
-/* =========================
-   INPUT HANDLING
-   ========================= */
-
-canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-canvas.addEventListener('click', (ev)=>{
-  const rect = canvas.getBoundingClientRect();
-  const mx = ev.clientX - rect.left;
-  const my = ev.clientY - rect.top;
-  const tx = Math.floor(mx / (rect.width / canvas.width) / TILE_SIZE);
-  const ty = Math.floor(my / (rect.height / canvas.height) / TILE_SIZE);
-  handleLeftClick(tx,ty);
-});
-
-canvas.addEventListener('contextmenu', (ev)=>{
-  ev.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const mx = ev.clientX - rect.left;
-  const my = ev.clientY - rect.top;
-  const tx = Math.floor(mx / (rect.width / canvas.width) / TILE_SIZE);
-  const ty = Math.floor(my / (rect.height / canvas.height) / TILE_SIZE);
-  handleRightClick(tx,ty);
-});
-
-function handleLeftClick(tx,ty){
-  if(!inBounds(tx,ty)) return;
-  // check units (player-owned first)
-  const unit = state.units.find(u=>u.x===tx && u.y===ty && u.owner===0);
-  if(unit){
-    state.selected = {type:'unit', id:unit.id};
-    updateSelectedBox();
-    redraw();
-    return;
-  }
-  // check city
-  const city = state.cities.find(c=>c.x===tx && c.y===ty);
-  if(city){
-    state.selected = {type:'city', id:city.id};
-    updateSelectedBox();
-    redraw();
-    return;
-  }
-  // check village
-  const village = state.villages.find(v=>v.x===tx && v.y===ty);
-  if(village){
-    state.selected = {type:'village', id:village.id};
-    updateSelectedBox();
-    redraw();
-    return;
-  }
-  // click on empty tile clears selection
-  state.selected = null;
-  updateSelectedBox();
-  redraw();
-}
-
-function handleRightClick(tx,ty){
-  if(state.phase !== 'player'){ pushLog('Not your turn.'); return; }
-  if(!inBounds(tx,ty)) return;
-  if(!state.selected){ pushLog('Select a unit or city first.'); return; }
-  if(state.selected.type==='unit'){
-    const unit = state.units.find(u=>u.id===state.selected.id);
-    if(!unit || unit.owner!==0){ pushLog('Invalid unit.'); return; }
-    // If selected unit is a transport and target tile has friendly land units adjacent, offer load/unload
-    const targetUnit = state.units.find(u=>u.x===tx && u.y===ty && u.owner!==unit.owner);
-    const targetCity = state.cities.find(c=>c.x===tx && c.y===ty);
-    const targetVillage = state.villages.find(v=>v.x===tx && v.y===ty);
-
-    // if target tile has enemy unit and in range -> attack
-    const enemyOnTile = state.units.find(u=>u.x===tx && u.y===ty && u.owner!==unit.owner);
-    if(enemyOnTile && distance(unit.x,unit.y,tx,ty) <= unit.range){
-      combat(unit, enemyOnTile);
-      redraw(); updateUI();
-      return;
-    }
-
-    // loading: right-click on friendly transport adjacent to unit to load
-    if(unit.cat==='land'){
-      // find friendly transport adjacent to this tile
-      const adjTransport = state.units.find(u=>u.type==='transport' && u.owner===unit.owner && Math.abs(u.x - tx)<=1 && Math.abs(u.y - ty)<=1 && u.x===tx && u.y===ty);
-      // But user right-clicks the transport tile to load the unit that is selected; create simpler behavior:
-    }
-
-    // If selected unit is a transport and we right-click on a friendly land tile adjacent to a transport that contains loadable units, do unload
-    if(unit.type === 'transport'){
-      // if has loaded units and target tile is land and adjacent to water, unload units
-      const destTerrain = state.map[ty][tx].terrain;
-      if(destTerrain !== 'water' && unit.loaded.length > 0){
-        // unload as many as fit to adjacent tiles (or exact tile)
-        const toUnload = [...unit.loaded]; unit.loaded = [];
-        for(const uid of toUnload){
-          const lu = allUnitsById(uid);
-          if(!lu) continue;
-          // find empty adjacent tile
-          let placed=false;
-          const adj = neighbors(tx,ty);
-          adj.unshift({x:tx,y:ty});
-          for(const p of adj){
-            if(!tileHasUnit(p.x,p.y) && state.map[p.y][p.x].terrain!=='water'){
-              lu.x = p.x; lu.y = p.y; placed=true; break;
-            }
-          }
-          if(!placed){
-            // if nowhere to place, drop at transport's tile (if land) or first adjacent land
-            lu.x = unit.x; lu.y = unit.y;
-          }
-        }
-        pushLog('Units unloaded from transport.');
-        redraw(); updateUI();
-        return;
-      }
-    }
-
-    // Otherwise move unit with pathfinding, respecting unit category
-    const path = findPath(unit, {x:tx,y:ty});
-    if(!path){ pushLog('No path.'); return; }
-    const steps = Math.min(unit.moves, path.length - 1);
-    const dest = path[steps];
-    // move
-    unit.x = dest.x; unit.y = dest.y; unit.moves -= steps;
-    pushLog(`${UNIT_DEF[unit.type].name} moved to (${unit.x},${unit.y})`);
-    // after move, if on enemy city or neutral city or village -> capture progression
-    const city = state.cities.find(c=>c.x===unit.x && c.y===unit.y && c.owner!==unit.owner);
-    if(city){
-      city.captureProgress = (city.captureProgress || 0) + 1;
-      pushLog(`Capturing city... (${city.captureProgress}/${CITY_CAPTURE_HOLD_TURNS})`);
-      if(city.captureProgress >= CITY_CAPTURE_HOLD_TURNS){
-        city.owner = unit.owner; city.captureProgress = 0;
-        pushLog(`${state.players[unit.owner].name} captured a city!`);
-      }
-    }
-    const village = state.villages.find(v=>v.x===unit.x && v.y===unit.y && v.owner!==unit.owner);
-    if(village){
-      village.captureProgress = (village.captureProgress||0) + 1;
-      pushLog(`Capturing village... (${village.captureProgress}/${VILLAGE_CAPTURE_HOLD})`);
-      if(village.captureProgress >= VILLAGE_CAPTURE_HOLD){
-        village.owner = unit.owner; pushLog(`${state.players[unit.owner].name} captured a village!`);
-      }
-    }
-
-    redraw(); updateUI();
-  } else if(state.selected.type==='city'){
-    pushLog('Right-click with unit selected to move/attack.');
-  } else if(state.selected.type==='village'){
-    pushLog('Select a unit to capture villages.');
-  }
-}
-
-/* =========================
-   PATHFINDING (A*), movement rules
-   ========================= */
-function inBounds(x,y){ return x>=0 && y>=0 && x<TILE_COUNT && y<TILE_COUNT; }
-function neighbors(x,y){
-  const out=[];
-  [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
-    const nx=x+d[0], ny=y+d[1];
-    if(inBounds(nx,ny)) out.push({x:nx,y:ny});
-  });
-  return out;
-}
-
-function tileHasUnit(x,y){
-  return state.units.some(u=>u.x===x && u.y===y);
-}
-
-function passableFor(unit, x,y){
-  if(!inBounds(x,y)) return false;
-  const terrain = state.map[y][x].terrain;
-  if(unit.cat==='land' && terrain==='water') return false;
-  if(unit.cat==='navy' && terrain!=='water') return false;
-  return true;
-}
-
-function findPath(unit, goal){
-  // A* with simple move cost from TERRAIN.move
-  const start = {x:unit.x, y:unit.y};
-  if(!inBounds(goal.x, goal.y)) return null;
-  const passable = (x,y)=> passableFor(unit,x,y);
-  const open = new Map();
-  const closed = new Set();
-  function key(p){ return `${p.x},${p.y}`; }
-  open.set(key(start), {...start, g:0, f:heuristic(start,goal), parent:null});
-  let iter=0, maxIter=2000;
-  while(open.size>0 && iter < maxIter){
-    iter++;
-    // get lowest f
-    let curK, cur;
-    for(const [k,v] of open){ if(!cur || v.f < cur.f) { cur=v; curK=k; } }
-    open.delete(curK);
-    closed.add(curK);
-    if(cur.x===goal.x && cur.y===goal.y){
-      // reconstruct
-      const path = [];
-      let p = cur;
-      while(p){ path.unshift({x:p.x,y:p.y}); p = p.parent; }
-      return path;
-    }
-    // neighbors
-    for(const n of neighbors(cur.x, cur.y)){
-      const nk = key(n);
-      if(closed.has(nk)) continue;
-      if(!passable(n.x,n.y)) continue;
-      const terrain = state.map[n.y][n.x].terrain;
-      const cost = (terrain==='water'?1 : (terrain==='mountain'?3:(terrain==='forest'?1.5:1)));
-      const g = cur.g + cost;
-      const h = heuristic(n,goal);
-      const f = g + h;
-      if(open.has(nk)){
-        const ex = open.get(nk);
-        if(g < ex.g) open.set(nk, {x:n.x,y:n.y,g,f,h,parent:cur});
+    // regular colored card
+    if(pid === 0 && !canPlayCard(card)){ updateStatus('Cannot play that card now'); return false; }
+    if(pid !== 0 && !aiCanPlayCard(pid, card)) return false;
+    // move to discard
+    const played = hand.splice(cardIndex,1)[0];
+    discard.push(played);
+    updateTopDiscard();
+    playCardPlay();
+    log(`${players[pid].name} played ${cardText(played)}`);
+    // handle actions: skip, reverse, draw2
+    applyCardEffect(pid, played);
+    // UNO logic: if the player now has 1 card, require UNO call
+    if(players[pid].hand.length === 1 && !players[pid].unoCalled){
+      // for human, show reminder; for AI pick random chance to 'forget' (we'll let AI call UNO automatically most of time)
+      if(pid !== 0){ // AI auto-call
+        players[pid].unoCalled = true;
+        log(`${players[pid].name} called UNO!`);
       } else {
-        open.set(nk, {x:n.x,y:n.y,g,f,h,parent:cur});
+        updateActionNote('You have 1 card — press UNO button!', 3000);
       }
     }
+    // victory check
+    if(players[pid].hand.length === 0){
+      playVictory();
+      updateStatus(`${players[pid].name} wins the round!`);
+      log(`${players[pid].name} wins!`);
+      // highlight and disable draw/play
+      disableInteraction();
+      return true;
+    }
+    // advance turn logic depends on effect (some actions already advanced)
+    if(!['skip','draw2','wild4'].includes(played.value)){
+      // normal flow: go to next player
+      advanceTurn();
+    }
+    updateTurnInfo();
+    renderPlayerHand();
+    renderPlayersTop();
+    renderPiles();
+    return true;
   }
-  return null;
 }
 
-function heuristic(a,b){
-  return Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
-}
-
-/* =========================
-   COMBAT
-   ========================= */
-function distance(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
-
-function combat(attacker, defender){
-  if(!attacker || !defender) return;
-  const atk = Math.max(1, UNIT_DEF[attacker.type].atk);
-  const def = Math.max(0, UNIT_DEF[defender.type].def);
-  const dmg = Math.max(1, atk - def);
-  defender.hp -= dmg;
-  pushLog(`${UNIT_DEF[attacker.type].name} hit ${UNIT_DEF[defender.type].name} for ${dmg}`);
-  if(defender.hp <= 0){
-    pushLog(`${UNIT_DEF[defender.type].name} destroyed`);
-    state.units = state.units.filter(u => u.id !== defender.id);
+function applyCardEffect(pid, card){
+  // card already placed on discard
+  if(card.value === 'skip'){
+    // skip next player
+    playSkip();
+    const skipped = getNextIndex(pid);
+    log(`${players[skipped].name} was skipped`);
+    // advance extra
+    advanceTurn(); // move to next player
+    advanceTurn(); // skip them
+  } else if(card.value === 'reverse'){
+    playReverse();
+    playDirection *= -1;
+    // If only two players, reverse acts as skip of opponent (UNO rule)
+    if(players.length === 2){
+      // reverse acts like skip
+      advanceTurn();
+    } else {
+      // simply change direction and advance once
+      advanceTurn();
+    }
+  } else if(card.value === 'draw2'){
+    // next player draws two and loses turn
+    const next = getNextIndex(pid);
+    drawCardsForPlayer(next, 2);
+    advanceTurn(); // skip next
+    advanceTurn();
+  } else if(card.value === 'wild4'){
+    // next player draws 4 and loses turn — chosen color is in card.chosenColor (set after color picker)
+    const next = getNextIndex(pid);
+    drawCardsForPlayer(next, 4);
+    advanceTurn();
+    advanceTurn();
   } else {
-    // counterattack if in range
-    if(distance(attacker.x,attacker.y,defender.x,defender.y) <= defender.range){
-      const counter = Math.max(1, UNIT_DEF[defender.type].atk - UNIT_DEF[attacker.type].def);
-      attacker.hp -= counter;
-      pushLog(`${UNIT_DEF[defender.type].name} countered for ${counter}`);
-      if(attacker.hp <= 0){ pushLog(`${UNIT_DEF[attacker.type].name} destroyed`); state.units = state.units.filter(u => u.id !== attacker.id); }
-    }
+    // normal number card -> just play
   }
 }
 
-/* =========================
-   TRANSPORT LOGIC
-   ========================= */
-function loadUnitIntoTransport(landUnit, transport){
-  if(transport.type !== 'transport') return false;
-  if(transport.owner !== landUnit.owner) return false;
-  if(transport.loaded.length >= transport.capacity) return false;
-  // remove from map? We will mark by moving unit off-map (x,y = transport.x,transport.y) and store its id
-  transport.loaded.push(landUnit.id);
-  // mark unit as "loaded"
-  landUnit.x = transport.x;
-  landUnit.y = transport.y;
-  pushLog(`${UNIT_DEF[landUnit.type].name} loaded into transport.`);
-  return true;
+/* -------------------------
+   Color picker & wild handling
+   ------------------------- */
+function showColorPicker(){
+  wildPicker.style.display = 'block';
+}
+function hideColorPicker(){
+  wildPicker.style.display = 'none';
+}
+function chooseColor(color){
+  if(!waitingColorPick) return;
+  const {pid, cardIndex} = waitingColorPick;
+  const hand = players[pid].hand;
+  const card = hand.splice(cardIndex,1)[0];
+  // set chosen color on card so discard shows it
+  card.chosenColor = color;
+  discard.push(card);
+  updateTopDiscard();
+  hideColorPicker();
+  waitingColorPick = null;
+  playCardPlay();
+  log(`${players[pid].name} played ${card.value === 'wild' ? 'Wild' : 'Wild Draw 4'} and chose ${color.toUpperCase()}`);
+  // apply effect
+  if(card.value === 'wild'){
+    // no further immediate effect, advance turn
+    topColor = color;
+    advanceTurn();
+  } else if(card.value === 'wild4'){
+    // wild4: draw 4 to next and skip
+    topColor = color;
+    const next = getNextIndex(pid);
+    drawCardsForPlayer(next, 4);
+    advanceTurn(); // skip
+    advanceTurn();
+  }
+  // UNO: if player ended with one card, prompt/auto-call
+  if(players[pid].hand.length === 1 && pid !== 0){ players[pid].unoCalled = true; }
+  updateTurnInfo(); renderPlayerHand(); renderPlayersTop(); renderPiles();
 }
 
-function unloadFromTransport(transport, atX, atY){
-  // attempt to place loaded units to adjacent land tiles
-  if(transport.type !== 'transport') return;
-  const toUnload = transport.loaded.slice();
-  transport.loaded = [];
-  for(const uid of toUnload){
-    const unit = allUnitsById(uid);
-    if(!unit) continue;
-    let placed=false;
-    const adj = neighbors(atX, atY);
-    adj.unshift({x:atX,y:atY});
-    for(const p of adj){
-      if(state.map[p.y][p.x].terrain !== 'water' && !tileHasUnit(p.x,p.y)){
-        unit.x = p.x; unit.y = p.y; placed=true; break;
-      }
+/* -------------------------
+   Player Draw action (button)
+   ------------------------- */
+drawBtn.addEventListener('click', ()=>{
+  if(currentPlayer !== 0) { updateStatus('Not your turn'); return; }
+  if(deck.length === 0) reshuffleDiscardIntoDeck();
+  if(deck.length === 0){ updateStatus('No cards left to draw'); return; }
+  const c = deck.pop();
+  players[0].hand.push(c);
+  animateDrawCardToHand(c);
+  playDraw();
+  renderPiles();
+  renderPlayerHand();
+  // If new card is playable, player may play it, else turn ends
+  const playable = canPlayCard(c);
+  if(!playable){
+    updateStatus('You drew a card and have no valid play — turn ends');
+    // advance turn
+    advanceTurn();
+    updateTurnInfo();
+    setTimeout(() => { aiTurnIfNeeded(); }, 800);
+  } else {
+    updateStatus('You drew a playable card — you may play it');
+  }
+});
+
+/* -------------------------
+   UNO button
+   ------------------------- */
+unoBtn.addEventListener('click', ()=>{
+  if(players[0].hand.length === 1){
+    players[0].unoCalled = true;
+    playUnoCall();
+    updateStatus('You called UNO!');
+    log('You called UNO!');
+  } else {
+    // pressing UNO when not 1 card -> penalty?
+    updateStatus('You can only call UNO when you have 1 card');
+  }
+});
+
+/* -------------------------
+   AI logic
+   ------------------------- */
+function aiTurnIfNeeded(){
+  if(stateEnded()) return;
+  if(currentPlayer === 0) return;
+  const pid = currentPlayer;
+  const p = players[pid];
+  // small delay for AI to "think"
+  setTimeout(() => {
+    // find playable cards
+    const playable = [];
+    for(let i=0;i<p.hand.length;i++){
+      if(aiCanPlayCard(pid, p.hand[i])) playable.push({idx:i, card:p.hand[i]});
     }
-    if(!placed){
-      // place on nearest valid tile
-      for(let r=1;r<5 && !placed;r++){
-        for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-          const nx=atX+dx, ny=atY+dy;
-          if(inBounds(nx,ny) && state.map[ny][nx].terrain!=='water' && !tileHasUnit(nx,ny)){ unit.x=nx; unit.y=ny; placed=true; break;}
+    if(playable.length === 0){
+      // draw one card
+      if(deck.length === 0) reshuffleDiscardIntoDeck();
+      if(deck.length > 0){
+        const c = deck.pop();
+        p.hand.push(c);
+        playDraw();
+        log(`${p.name} drew a card`);
+        // if playable, 50% chance to play immediately
+        const justPlayable = aiCanPlayCard(pid, c);
+        if(justPlayable && Math.random() < 0.9){
+          // play it
+          const idx = p.hand.length -1;
+          aiPlayCard(pid, idx);
+          return;
         }
-        if(placed) break;
       }
-    }
-  }
-  pushLog('Transport unloaded.');
-}
-
-/* =========================
-   UPKEEP & RESOURCE COLLECTION
-   ========================= */
-function collectResources(){
-  // reset nothing; for each city, produce resources proportional to level
-  for(const city of state.cities){
-    if(city.owner === null) continue;
-    const owner = state.players[city.owner];
-    for(const rk of RESOURCE_KEYS){
-      const amt = Math.floor((CITY_BASE_PROD[rk] || 0) * city.level);
-      owner.resources[rk] = (owner.resources[rk] || 0) + amt;
-    }
-    // nearby nodes give small bonuses
-    const r=2;
-    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-      const nx=city.x+dx, ny=city.y+dy;
-      if(inBounds(nx,ny) && state.map[ny][nx].resource){
-        const res = state.map[ny][nx].resource;
-        owner.resources[res] = (owner.resources[res]||0) + 1 * city.level;
-      }
-    }
-  }
-  // villages give small gold each turn for owner
-  for(const v of state.villages) if(v.owner!==null){
-    state.players[v.owner].resources.gold += 2;
-  }
-  // upkeep: subtract food from each player's units
-  const upkeep = [0,0];
-  for(const u of state.units){
-    const up = u.upkeep && u.upkeep.food ? u.upkeep.food : 0;
-    upkeep[u.owner] += up;
-  }
-  for(const pid of [0,1]){
-    state.players[pid].resources.food -= upkeep[pid];
-    if(upkeep[pid] > 0) pushLog(`${state.players[pid].name} paid ${upkeep[pid]} food upkeep.`);
-    if(state.players[pid].resources.food < 0){
-      // attrition
-      state.players[pid].resources.food = 0;
-      // damage some units
-      for(const u of state.units.filter(uu=>uu.owner===pid)){ u.hp -= 2; }
-      state.units = state.units.filter(uu=>uu.hp>0);
-      pushLog(`${state.players[pid].name} suffered attrition due to lack of food.`);
-    }
-  }
-}
-
-/* =========================
-   TRAIN & UPGRADE
-   ========================= */
-function canAfford(playerId, type){
-  const cost = UNIT_DEF[type].cost;
-  const p = state.players[playerId];
-  for(const k in cost) if((p.resources[k] || 0) < cost[k]) return false;
-  return true;
-}
-function spendCost(playerId, type){
-  const cost = UNIT_DEF[type].cost;
-  const p = state.players[playerId];
-  for(const k in cost) p.resources[k] = (p.resources[k]||0) - cost[k];
-}
-
-/* =========================
-   UTILITIES
-   ========================= */
-function allUnitsById(id){
-  return state.units.find(u=>u.id===id);
-}
-
-/* =========================
-   END TURN & AI
-   ========================= */
-function endTurn(){
-  if(state.phase !== 'player') return;
-  // reset moves
-  state.units.forEach(u => u.moves = u.maxMoves);
-  collectResources();
-  state.turn++;
-  state.phase = 'ai';
-  pushLog('Player turn ended. Rival thinking...');
-  updateUI();
-  setTimeout(()=>{ aiProcess(); }, 400);
-}
-
-function aiProcess(){
-  // advanced-ish AI:
-  // - evaluate economy and train units (land/navy/transport) depending on geography and threats
-  // - use transports to move armies across water to player islands
-  // - move units towards vulnerable targets (player cities with low defense, villages)
-  // - attack when advantageous
-  const ai = state.players[1];
-
-  // Training logic: check cities owned by AI
-  const aiCities = state.cities.filter(c=>c.owner===1);
-  for(const city of aiCities){
-    // compute simple composition: if near water, favor transports + navy, else land
-    const nearWater = nearbyTerrainCount(city.x,city.y,'water',5) > 6;
-    let toTrain = 'infantry';
-    if(nearWater && Math.random()<0.5) toTrain = 'transport';
-    else {
-      // based on resources, train mixed
-      const r = Math.random();
-      if(r < 0.25) toTrain = 'tank';
-      else if(r < 0.45) toTrain = 'artillery';
-      else toTrain = 'infantry';
-    }
-    if(canAfford(1,toTrain) && Math.random()<0.6){
-      spendCost(1,toTrain);
-      createUnit(toTrain,1, city.x+1, city.y);
-      pushLog('Rival trained ' + UNIT_DEF[toTrain].name);
-    }
-  }
-
-  // Build invasion groups: find transports and load nearest land units, then move to player islands
-  const transports = state.units.filter(u=>u.owner===1 && u.type==='transport');
-  const aiLandUnits = state.units.filter(u=>u.owner===1 && u.cat==='land');
-  for(const t of transports){
-    // if transport empty, try to load nearby land units
-    if(t.loaded.length < t.capacity){
-      const nearbyLand = aiLandUnits.find(lu => distance(lu.x,lu.y,t.x,t.y) <= 2 && !t.loaded.includes(lu.id));
-      if(nearbyLand){
-        t.loaded.push(nearbyLand.id);
-        pushLog('Rival loaded ' + UNIT_DEF[nearbyLand.type].name + ' into transport.');
-      }
+      // end turn
+      advanceTurn();
+      updateTurnInfo();
+      renderPlayersTop();
+      renderPiles();
+      // next AI or player
+      setTimeout(() => { aiTurnIfNeeded(); }, 600);
     } else {
-      // find a target: player city that is not heavily defended
-      const targets = state.cities.filter(c=>c.owner===0);
-      if(targets.length > 0){
-        // choose the one with lowest nearby defense
-        let best=null, bestScore=9999;
-        for(const tg of targets){
-          const defense = state.units.filter(u=>u.owner===0 && distance(u.x,u.y,tg.x,tg.y) <= 4).length;
-          const d = distance(t.x,t.y,tg.x,tg.y) + defense*6;
-          if(d < bestScore){ bestScore=d; best=tg; }
-        }
-        if(best){
-          // path transport across water to nearest coastal tile of target
-          const seaGoal = nearestSeaTileTo(best.x,best.y);
-          if(seaGoal){
-            // move transport toward seaGoal
-            const path = findPath(t, seaGoal);
-            if(path && path.length>1){
-              const steps = Math.min(t.moves, path.length-1);
-              const dest = path[steps];
-              t.x = dest.x; t.y = dest.y; t.moves -= steps;
-              pushLog('Rival moved a transport.');
-            }
-            // attempt unload if adjacent and close to land target
-            if(distance(t.x,t.y,best.x,best.y) <= 2){
-              // unload onto nearest land tile
-              unloadFromTransport(t, best.x, best.y);
-            }
-          }
-        }
-      }
+      // choose card with preference: color match -> value match -> wild -> wild4 (only if legal)
+      // score them
+      playable.sort((a,b)=>{
+        const as = scoreCardForAI(a.card), bs = scoreCardForAI(b.card);
+        return bs - as;
+      });
+      const choice = playable[0];
+      aiPlayCard(pid, choice.idx);
     }
-  }
-
-  // Move other AI units: simple: move toward nearest player city or unit
-  for(const u of state.units.filter(u=>u.owner===1 && u.type !== 'transport')){
-    // choose target
-    let target = null;
-    let bestd = 9999;
-    // Prefer cities owned by player
-    for(const c of state.cities.filter(cc=>cc.owner===0)){
-      const d = distance(u.x,u.y,c.x,c.y);
-      if(d < bestd){ bestd=d; target={x:c.x,y:c.y}; }
-    }
-    if(!target){
-      const enemyUnit = state.units.find(uu=>uu.owner===0);
-      if(enemyUnit) target = {x:enemyUnit.x, y:enemyUnit.y};
-    }
-    if(target){
-      const path = findPath(u, target);
-      if(path && path.length>1){
-        const steps = Math.min(u.moves, path.length-1);
-        const dest = path[steps];
-        u.x = dest.x; u.y = dest.y; u.moves -= steps;
-        // attack entrance if enemy found
-        const enemy = state.units.find(e=>e.x===u.x && e.y===u.y && e.owner===0);
-        if(enemy && distance(u.x,u.y,enemy.x,enemy.y) <= u.range){
-          combat(u, enemy);
-        }
-      }
-    } else {
-      // wander
-      const rdx = rand(3)-1, rdy = rand(3)-1;
-      const nx = clamp(u.x+rdx,0,TILE_COUNT-1), ny = clamp(u.y+rdy,0,TILE_COUNT-1);
-      if(passableFor(u,nx,ny)) { u.x = nx; u.y = ny; }
-    }
-  }
-
-  // reset moves
-  state.units.forEach(u => u.moves = u.maxMoves);
-
-  // end AI turn
-  state.phase = 'player';
-  pushLog('Rival turn complete. Your move.');
-  updateUI(); redraw();
-  checkVictory();
+  }, 700 + Math.random()*700);
 }
 
-/* =========================
-   AI Helper functions
-   ========================= */
-function nearbyTerrainCount(cx,cy,terrainType, radius){
-  let count=0;
-  for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++){
-    const nx=cx+dx, ny=cy+dy;
-    if(inBounds(nx,ny) && state.map[ny][nx].terrain===terrainType) count++;
-  }
-  return count;
+function scoreCardForAI(card){
+  // prefer color match first (value 5), then number/symbol match (3), then wild(2), wild4(1)
+  let score = 0;
+  if(card.color !== 'wild' && card.color === topColor) score += 5;
+  if(card.value === topValue) score += 3;
+  if(card.color === 'wild' && card.value === 'wild') score += 2;
+  if(card.color === 'wild' && card.value === 'wild4') score += 1;
+  // prefer action cards if opponent has few cards
+  const opponents = players.filter((_,i)=>i!==currentPlayer);
+  const nearestOpp = opponents.reduce((a,b)=> (a.hand.length < b.hand.length ? a : b));
+  if(nearestOpp.hand.length <= 2 && ['skip','reverse','draw2','wild4'].includes(card.value)) score += 3;
+  return score;
 }
 
-function nearestSeaTileTo(x,y){
-  // find nearest water tile adjacent to any land tile of target island
-  // simple approach: search outward for water tile that has passable route for naval units
-  for(let r=1;r<20;r++){
-    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-      const nx=x+dx, ny=y+dy;
-      if(inBounds(nx,ny) && state.map[ny][nx].terrain==='water'){
-        // ensure it has some water neighbors (not isolated)
-        return {x:nx,y:ny};
+function aiPlayCard(pid, cardIndex){
+  const p = players[pid];
+  const card = p.hand[cardIndex];
+  // for wilds, pick random color
+  if(card.color === 'wild'){
+    // check legality for wild4
+    if(card.value === 'wild4'){
+      const hasColorMatch = p.hand.some((h,idx) => h.color === topColor && h.color !== 'wild' && idx !== cardIndex);
+      if(hasColorMatch){ 
+        // can't play it; fallback: play other wild or other card; if impossible, draw
+        // try to find another playable
+        for(let i=0;i<p.hand.length;i++){
+          if(i===cardIndex) continue;
+          if(aiCanPlayCard(pid, p.hand[i])) { aiPlayCard(pid,i); return; }
+        }
+        // else draw
+        if(deck.length>0){ const c = deck.pop(); p.hand.push(c); log(`${p.name} drew a card`); }
+        advanceTurn(); updateTurnInfo(); renderPlayersTop(); renderPiles(); return;
       }
     }
-  }
-  return null;
-}
-
-/* =========================
-   CHECK VICTORY / LOSS
-   ========================= */
-function checkVictory(){
-  // if a player has no cities or no units -> lose
-  for(const pid of [0,1]){
-    const cities = state.cities.filter(c=>c.owner===pid);
-    const units = state.units.filter(u=>u.owner===pid && u.type!=='transport');
-    if(cities.length===0 || units.length===0){
-      const winner = pid===0 ? 'Rival' : 'Player';
-      pushLog(`${state.players[pid].name} eliminated. ${winner} wins!`);
-      state.phase = 'end';
-      alert(`${winner} wins!`);
+    // choose random color weighted by what's in AI's hand
+    const counts = {red:0,yellow:0,green:0,blue:0};
+    for(const h of p.hand) if(h.color && h.color!=='wild') counts[h.color]++;
+    let chosen = 'red';
+    let best = -1;
+    for(const k of ['red','yellow','green','blue']) if(counts[k] > best){ best = counts[k]; chosen = k; }
+    // if tied, random
+    if(best === 0) chosen = ['red','yellow','green','blue'][Math.floor(Math.random()*4)];
+    // set chosen color on card and play
+    const played = p.hand.splice(cardIndex,1)[0];
+    played.chosenColor = chosen;
+    discard.push(played);
+    updateTopDiscard();
+    playCardPlay();
+    log(`${p.name} played ${played.value.toUpperCase()} and chose ${chosen.toUpperCase()}`);
+    if(played.value === 'wild') {
+      topColor = chosen;
+      advanceTurn();
+    } else if(played.value === 'wild4'){
+      topColor = chosen;
+      const next = getNextIndex(pid);
+      drawCardsForPlayer(next,4);
+      advanceTurn(); advanceTurn();
+    }
+    // UNO logic
+    if(p.hand.length === 1){ p.unoCalled = true; log(`${p.name} called UNO!`); }
+    // victory check
+    if(p.hand.length === 0){
+      playVictory();
+      updateStatus(`${p.name} wins!`);
+      disableInteraction();
       return;
     }
+    renderPlayersTop(); renderPiles(); updateTurnInfo();
+  } else {
+    // normal colored card: validate (should be valid)
+    if(!aiCanPlayCard(pid, card)){ /* fallback */ }
+    const played = p.hand.splice(cardIndex,1)[0];
+    discard.push(played);
+    updateTopDiscard();
+    playCardPlay();
+    log(`${p.name} played ${cardText(played)}`);
+    applyCardEffect(pid, played);
+    // UNO
+    if(p.hand.length === 1){ p.unoCalled = true; log(`${p.name} called UNO!`); }
+    if(p.hand.length === 0){
+      playVictory();
+      updateStatus(`${p.name} wins!`);
+      disableInteraction();
+      return;
+    }
+    renderPlayersTop(); renderPiles(); renderPlayerHand();
+    updateTurnInfo();
   }
 }
 
-/* =========================
-   UI: Train / Upgrade / Save / Load
-   ========================= */
-document.getElementById('newGameBtn').onclick = ()=>{ newGame(); };
-document.getElementById('endTurnBtn').onclick = ()=>{ endTurn(); };
-document.getElementById('saveBtn').onclick = ()=>{ localStorage.setItem('empireforge.save', JSON.stringify(state)); pushLog('Saved game to localStorage.'); };
-document.getElementById('loadBtn').onclick = ()=>{ const s=localStorage.getItem('empireforge.save'); if(s){ state=JSON.parse(s); pushLog('Loaded save.'); redraw(); updateUI(); } else pushLog('No save found.'); };
-
-document.getElementById('trainBtn').onclick = ()=>{
-  if(!state.selected || state.selected.type!=='city'){ pushLog('Select one of your cities to train units.'); return; }
-  const city = state.cities.find(c=>c.id===state.selected.id);
-  if(!city || city.owner!==0){ pushLog('You must select a city you own'); return; }
-  const type = document.getElementById('trainSelect').value;
-  if(!canAfford(0,type)){ pushLog('Not enough resources to train '+type); return; }
-  spendCost(0,type);
-  createUnit(type, 0, city.x+1, city.y);
-  pushLog('Trained ' + UNIT_DEF[type].name);
-  updateUI(); redraw();
-};
-
-document.getElementById('upgradeBtn').onclick = ()=>{
-  if(!state.selected || state.selected.type!=='city'){ pushLog('Select one of your cities to upgrade.'); return; }
-  const city = state.cities.find(c=>c.id===state.selected.id);
-  if(city.owner !== 0){ pushLog('You do not own that city.'); return; }
-  const cost = Math.floor(60 * Math.pow(CITY_UPGRADE_MULT, city.level));
-  if((state.players[0].resources.gold||0) < cost){ pushLog('Not enough gold to upgrade.'); return; }
-  state.players[0].resources.gold -= cost;
-  city.level++;
-  pushLog('City upgraded to level ' + city.level);
-  updateUI(); redraw();
-};
-
-/* =========================
-   UI Helpers
-   ========================= */
-function updateSelectedBox(){
-  const el = document.getElementById('selBox');
-  if(!state.selected){ el.innerHTML = 'Selected: None'; return; }
-  if(state.selected.type==='unit'){
-    const u = state.units.find(uu=>uu.id===state.selected.id);
-    if(!u){ el.innerHTML='Selected: None'; return; }
-    el.innerHTML = `<b>${UNIT_DEF[u.type].name}</b> • HP ${u.hp}/${u.maxHp} • Moves ${u.moves}/${u.maxMoves} • Owner: ${state.players[u.owner].name}`;
-    if(u.type==='transport') el.innerHTML += `<div class="mini">Loaded: ${u.loaded.length}/${u.capacity}</div>`;
-  } else if(state.selected.type==='city'){
-    const c = state.cities.find(cc=>cc.id===state.selected.id);
-    el.innerHTML = `<b>City (L${c.level})</b><div class="mini">Owner: ${c.owner===null ? 'Neutral' : state.players[c.owner].name}</div>`;
-  } else if(state.selected.type==='village'){
-    const v = state.villages.find(vv=>vv.id===state.selected.id);
-    el.innerHTML = `<b>Village</b><div class="mini">Owner: ${v.owner===null ? 'Neutral' : state.players[v.owner].name}</div>`;
+/* -------------------------
+   Rendering helpers
+   ------------------------- */
+function renderPiles(){
+  // draw count on deck
+  const back = document.querySelector('#drawPile .cardBack');
+  back.textContent = deck.length;
+  updateTopDiscard();
+}
+function renderPlayerHand(){
+  // clear and render bottom player hand
+  playerHandEl.innerHTML = '';
+  const hand = players[0].hand;
+  // highlight playable card(s)
+  for(let i=0;i<hand.length;i++){
+    const c = hand[i];
+    const el = document.createElement('div');
+    el.className = 'handCard ' + (c.color==='wild' ? 'face-wild' : (c.color==='red'?'face-red':(c.color==='yellow'?'face-yellow':(c.color==='green'?'face-green':'face-blue'))));
+    el.innerHTML = `<div style="font-size:18px">${c.value==='skip'?'⏭':(c.value==='reverse'?'⤾':(c.value==='draw2'?'+2':(c.value==='wild'?'★':(c.value==='wild4'?'+4':c.value))))}</div>`;
+    // highlight if playable
+    if(canPlayCard(c)) { el.style.boxShadow = '0 18px 36px rgba(0,0,0,0.6), 0 0 0 4px rgba(125,211,252,0.06)'; el.style.transform='translateY(-6px)'; }
+    el.addEventListener('click', ()=>{ 
+      // play attempt
+      if(canPlayCard(c)){
+        // locate exact index again - in case changed
+        const idx = players[0].hand.indexOf(c);
+        playCard(0, idx);
+        // if not waiting for color, and turn moved to AI, trigger AI
+        renderPlayerHand();
+        renderPlayersTop();
+        renderPiles();
+        updateTurnInfo();
+        if(currentPlayer !== 0) setTimeout(()=>aiTurnIfNeeded(), 600);
+      } else {
+        updateStatus('Cannot play that card');
+      }
+    });
+    playerHandEl.appendChild(el);
   }
 }
 
-function updateResourceDisplay(){
-  const p = state.players[0];
-  const el = document.getElementById('resourceDisplay');
-  el.innerHTML = RESOURCE_KEYS.map(k=>`<div class="res">${k.toUpperCase()}: ${p.resources[k]||0}</div>`).join('');
+function renderPlayersTop(){
+  playersTopEl.innerHTML = '';
+  for(let i=1;i<players.length;i++){
+    const p = players[i];
+    const cont = document.createElement('div');
+    cont.className = 'aiHand';
+    cont.style.flexDirection = 'column';
+    const label = document.createElement('div');
+    label.className = 'small'; label.textContent = `${p.name} (${p.hand.length})`;
+    const row = document.createElement('div'); row.style.display='flex'; row.style.gap='6px';
+    // show face-down cards as small
+    for(let j=0;j<Math.min(p.hand.length,10);j++){
+      const card = document.createElement('div'); card.className='aiCard';
+      row.appendChild(card);
+    }
+    cont.appendChild(row); cont.appendChild(label);
+    playersTopEl.appendChild(cont);
+  }
 }
 
-function updateUI(){
-  updateResourceDisplay();
-  updateSelectedBox();
-  redraw();
+/* -------------------------
+   Animations
+   ------------------------- */
+function animateDrawCardToHand(card){
+  // simple brief flash to indicate draw (no DOM card fly for brevity)
+  playDraw();
 }
 
-/* =========================
-   Afford helpers
-   ========================= */
-function canAfford(playerId, type){
-  const cost = UNIT_DEF[type].cost || {};
-  const p = state.players[playerId];
-  for(const k in cost) if((p.resources[k]||0) < cost[k]) return false;
-  return true;
-}
-function spendCost(playerId, type){
-  const cost = UNIT_DEF[type].cost || {};
-  const p = state.players[playerId];
-  for(const k in cost) p.resources[k] = (p.resources[k]||0) - cost[k];
+/* -------------------------
+   Turn & status updates
+   ------------------------- */
+function updateTurnInfo(){
+  turnInfoEl.textContent = `Turn: ${players[currentPlayer].name}`;
+  statusEl.textContent = `Top: ${topColor ? topColor.toUpperCase() : ''} ${topValue ? topValue : ''}`;
+  // If it is AI's turn, trigger AI
+  if(currentPlayer !== 0){
+    setTimeout(()=>{ aiTurnIfNeeded(); }, 600);
+  }
 }
 
-/* =========================
-   Misc helpers & init
-   ========================= */
-function allUnits(){ return state.units; }
-
-function distance(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
-
-function redrawAndUpdate(){
-  redraw();
-  updateUI();
+function updateStatus(msg){
+  actionNoteEl.innerText = msg;
+  setTimeout(()=>{ if(actionNoteEl.innerText === msg) actionNoteEl.innerText = ''; }, 3000);
+  log(msg);
 }
 
-/* =========================
-   INITIALIZE GAME
-   ========================= */
-newGame();
-updateUI();
-redraw();
+function disableInteraction(){
+  // disable draw/drawBtn/unobutton (simple: hide)
+  drawBtn.disabled = true; unoBtn.disabled = true; newGameBtn.disabled = false;
+}
 
-/* =========================
-   Keyboard Shortcuts
-   ========================= */
-window.addEventListener('keydown', (e)=>{
-  if(e.key === 'Enter') endTurn();
-  if(e.key === 's' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); localStorage.setItem('empireforge.save', JSON.stringify(state)); pushLog('Saved (shortcut).'); }
-  if(e.key === 'l' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); const s=localStorage.getItem('empireforge.save'); if(s){ state = JSON.parse(s); pushLog('Loaded (shortcut).'); redraw(); updateUI(); } else pushLog('No save'); }
+/* -------------------------
+   UNO penalty enforcement
+   ------------------------- */
+// When someone has 1 card but didn't call UNO (players[].unoCalled false) and another player plays before they call, they should be penalized (+2)
+function checkUnoPenaltyOnAction(byPlayerIndex){
+  // any other player with 1 card and unoCalled=false gets penalty
+  for(let i=0;i<players.length;i++){
+    if(i === byPlayerIndex) continue;
+    if(players[i].hand.length === 1 && !players[i].unoCalled){
+      // penalty
+      drawCardsForPlayer(i,2);
+      updateStatus(`${players[i].name} forgot UNO and draws 2!`);
+      log(`${players[i].name} forgot UNO and was penalized`);
+      // mark they still have 1+ cards (or more)
+      players[i].unoCalled = false;
+    }
+  }
+}
+
+/* -------------------------
+   Event Listeners for wild color pick
+   ------------------------- */
+pickRed.addEventListener('click', ()=>{ chooseColor('red'); });
+pickYellow.addEventListener('click', ()=>{ chooseColor('yellow'); });
+pickGreen.addEventListener('click', ()=>{ chooseColor('green'); });
+pickBlue.addEventListener('click', ()=>{ chooseColor('blue'); });
+
+/* -------------------------
+   Helpers: disable card play UI if not player's turn
+   ------------------------- */
+function stateEnded(){
+  // check if any player has 0 cards and game ended
+  return players.some(p=>p.hand && p.hand.length === 0);
+}
+
+/* -------------------------
+   Button wired new game
+   ------------------------- */
+newGameBtn.addEventListener('click', ()=>{
+  newGame();
+  renderPlayerHand();
+  renderPlayersTop();
+  renderPiles();
+  updateTurnInfo();
 });
+
+/* -------------------------
+   Initial state
+   ------------------------- */
+(function init(){
+  // set up initial rending and disable draw/uno until start
+  drawBtn.disabled = false; unoBtn.disabled = false;
+  // initial empty piles
+  deck = []; discard = [];
+  updateTopDiscard();
+  renderPiles();
+  updateStatus('Ready. Choose AI count and press New Game.');
+})();
 
 </script>
 </body>
